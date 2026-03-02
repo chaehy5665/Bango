@@ -1,0 +1,135 @@
+================================================================================
+TASK 4: Database Schema Design + Migration - EVIDENCE
+================================================================================
+
+Date: 2025-03-02
+Status: COMPLETE ✓
+
+OBJECTIVE:
+Create comprehensive Supabase migration with 6 tables for bango PC bang platform
+
+DELIVERABLES VERIFICATION:
+================================================================================
+
+1. MIGRATION FILE CREATED
+   File: supabase/migrations/20260302112153_create_venue_schema.sql
+   Status: ✓ COMPLETE
+   Lines: 135
+   Size: 4801 bytes
+
+2. POSTGIS GEOGRAPHY IMPLEMENTATION
+   Status: ✓ COMPLETE
+   Evidence:
+   - Line 9: location GEOGRAPHY(POINT, 4326) NOT NULL
+   - Line 22: CREATE INDEX idx_venues_location ON venues USING GIST (location);
+   - Correct type used (not geometry)
+
+3. ALL 6 TABLES CREATED
+   Status: ✓ COMPLETE
+   Tables:
+   - venues (lines 6-20) — Core table with PostGIS location
+   - venue_pricing (lines 25-35) — JSONB pricing structures
+   - venue_specs (lines 39-52) — Hardware specifications
+   - venue_peripherals (lines 56-65) — Gaming peripherals with ENUM type
+   - venue_menu_items (lines 69-79) — Food/beverage menu
+   - venue_images (lines 84-94) — Cloudinary URLs with ENUM categories
+
+4. ENUM TYPES FOR TYPESCRIPT SAFETY
+   Status: ✓ COMPLETE
+   - Line 3: peripheral_type ENUM (keyboard, mouse, headset, chair)
+   - Line 4: image_category ENUM (exterior, interior, setup, menu)
+
+5. JSONB COLUMNS
+   Status: ✓ COMPLETE
+   - Line 13: venues.operating_hours JSONB
+   - Line 29: venue_pricing.pricing_structure JSONB
+   - Line 34: CHECK constraint for pricing_structure object validation
+
+6. FOREIGN KEYS WITH CASCADE
+   Status: ✓ COMPLETE
+   All dependent tables:
+   - Line 27: venue_pricing → venues ON DELETE CASCADE
+   - Line 41: venue_specs → venues ON DELETE CASCADE
+   - Line 58: venue_peripherals → venues ON DELETE CASCADE
+   - Line 71: venue_menu_items → venues ON DELETE CASCADE
+   - Line 86: venue_images → venues ON DELETE CASCADE
+
+7. UNIQUE CONSTRAINTS
+   Status: ✓ COMPLETE
+   - Line 33: UNIQUE(venue_id, tier_name) — prevent duplicate pricing tiers
+   - Line 41: venue_id UNIQUE — one spec per venue
+   - Line 64: UNIQUE(venue_id, peripheral_type) — one of each peripheral
+
+8. UPDATED_AT TRIGGERS
+   Status: ✓ COMPLETE
+   - Lines 99-105: update_updated_at_column() function
+   - Lines 107-135: Six triggers (one per table) — ALL tables covered
+
+9. CHECK CONSTRAINTS
+   Status: ✓ COMPLETE
+   - Line 19: total_seats >= 0
+   - Line 50: ram_gb > 0
+   - Line 51: internet_speed_mbps >= 0
+   - Line 78: price_krw >= 0
+   - Line 93: display_order >= 0
+
+10. KOREAN-SPECIFIC DESIGN
+    Status: ✓ COMPLETE
+    - amenities TEXT[] for Korean labels (24시간, 흡연실, etc.)
+    - Separate address_full and address_district for 구 filtering
+    - Menu categories flexible for Korean taxonomy (라면, 음료, 스낵, 주류)
+
+BUILD VERIFICATION:
+================================================================================
+Command: bunx supabase db lint
+Status: ✓ PASSED (zero schema errors)
+Output: Only pre-existing warnings from unrelated functions
+        (claim_queue_items_batch, claim_queue_items_direct)
+
+Command: bun run build
+Status: ✓ COMPLETE (compiled successfully in 1550ms)
+TypeScript Check: ✓ PASSED
+Route Generation: ✓ 4/4 pages generated
+No errors, no warnings
+
+CODE QUALITY:
+================================================================================
+✓ No TODO/FIXME/HACK comments
+✓ No @ts-ignore or 'as any' casts
+✓ All constraints named clearly
+✓ Consistent naming convention (snake_case)
+✓ Proper indentation and formatting
+
+NOTEPAD VERIFICATION:
+================================================================================
+File: .sisyphus/notepads/pcroom-mvp/learnings.md
+Status: ✓ APPENDED (lines 234-260)
+Content:
+- Schema design decisions (geography vs geometry)
+- PostGIS indexing strategy
+- Korean-specific considerations
+- JSONB usage rationale
+
+NEXT STEPS (DEPENDENCIES):
+================================================================================
+This task enables:
+- Task 5: RPC functions for geo-queries (requires venues.location)
+- Task 6: Seeding pipeline (requires all 6 tables)
+- Task 7: Admin CRUD operations (requires complete schema)
+- Task 9: Map view component (requires PostGIS queries)
+- Task 10: Venue detail page (requires all tables)
+
+CRITICAL DESIGN NOTES:
+================================================================================
+1. GEOGRAPHY(POINT, 4326) chosen over GEOMETRY for accurate distance 
+   calculations across Seoul metro area
+2. GIST index mandatory for spatial query performance (radius, nearest-neighbor)
+3. JSONB for pricing/hours allows real-world variability without migrations
+4. CASCADE deletes prevent orphaned records during admin operations
+5. ENUM types provide TypeScript type safety when generating client types
+
+================================================================================
+Task 4 COMPLETE ✓
+Schema design verified, lint passed, build successful.
+Ready for Task 5: RPC functions for geo-queries.
+================================================================================

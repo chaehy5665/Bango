@@ -1,0 +1,164 @@
+================================================================================
+TASK 6: Initial Data Seeding Pipeline - EVIDENCE
+================================================================================
+
+Date: 2025-03-02
+Status: COMPLETE ✓ (after fix)
+
+OBJECTIVE:
+Create seed migration with realistic Korean PC bang data for testing
+
+ISSUE DETECTED & RESOLVED:
+- Initial attempt created empty file (0 lines)
+- Fixed via session resume with specific error details
+- Final file: 268 lines of complete SQL seed data
+
+DELIVERABLES VERIFICATION:
+================================================================================
+
+1. MIGRATION FILE CREATED
+   File: supabase/migrations/20260302113127_seed_initial_venues.sql
+   Status: ✓ COMPLETE
+   Lines: 268
+   Structure: BEGIN transaction + 6 INSERT blocks + COMMIT
+
+2. VENUES SEEDED (10 total)
+   Status: ✓ COMPLETE
+   Districts covered: 10 unique Seoul 구
+   - 강남구 (Gangnam)
+   - 마포구 (Mapo - Hongdae)
+   - 종로구 (Jongno)
+   - 송파구 (Songpa - Jamsil)
+   - 영등포구 (Yeongdeungpo)
+   - 관악구 (Gwanak - Sillim)
+   - 광진구 (Gwangjin - Konkuk)
+   - 노원구 (Nowon)
+   - 서대문구 (Seodaemun - Sinchon)
+   - 구로구 (Guro)
+   
+   Data per venue:
+   - Korean names (레전드 PC방, 게이밍존, etc.)
+   - PostGIS coordinates (ST_SetSRID(ST_MakePoint(lng, lat), 4326)::geography)
+   - Korean addresses with district
+   - Phone numbers (Korean format)
+   - Operating hours JSONB (weekday/weekend patterns)
+   - Amenities TEXT[] (24시간, 무료 음료, 흡연실, etc.)
+   - Total seats (76-148 range)
+   - Parking availability (bool)
+
+3. PRICING TIERS SEEDED (22 total, 1-3 per venue)
+   Status: ✓ COMPLETE
+   Tier types: 일반석, 프리미엄석, 커플석, VIP석
+   Pricing structure JSONB examples:
+   - {"hourly":1200-1900, "3hours":3400-5500, "6hours":6400-10100, "overnight":9100-14900}
+   - Some with packages: {"package":{"30hours":45000, "50hours":76000}}
+   Prices in realistic KRW range (1200-1900/hour)
+
+4. SPECS SEEDED (10 total, 1 per venue)
+   Status: ✓ COMPLETE
+   CPUs: Intel i5-13400 to i9-14900K, AMD Ryzen 5-7 series
+   GPUs: NVIDIA RTX 4060/4070/4080, AMD RX 7600/7800 XT
+   RAM: 16GB, 32GB, or 64GB
+   Storage: NVMe SSD 500GB/1TB
+   Monitors: 24인치/27인치 144Hz/165Hz/240Hz IPS
+   Internet: 500-1000 Mbps
+
+5. PERIPHERALS SEEDED (40 total, 4 per venue)
+   Status: ✓ COMPLETE
+   Types: keyboard, mouse, headset, chair (all 4 for each venue)
+   Brands: Logitech, Razer, Corsair, SteelSeries, HyperX, Herman Miller, DXRacer, Secretlab
+   Models: G Pro X, DeathAdder V3, Cloud III, Aeron Gaming, etc.
+
+6. MENU ITEMS SEEDED (60 total, 6 per venue)
+   Status: ✓ COMPLETE
+   Categories: 라면, 음료, 스낵, 주류
+   Korean items: 신라면 (3500-3800원), 콜라 (1700-1800원), 새우깡 (1500원), 참이슬 (4000-4500원)
+   All marked as available (is_available: true)
+
+7. IMAGES SEEDED (30 total, 3 per venue)
+   Status: ✓ COMPLETE
+   Placeholder URLs: Lorem Picsum (https://picsum.photos/800/600?random=<id>)
+   Categories: exterior, interior, setup, menu
+   Alt text in Korean
+   Display order: 1, 2, 3
+
+BUILD VERIFICATION:
+================================================================================
+Command: bunx supabase db lint
+Status: ✓ PASSED (zero migration errors)
+Output: Only pre-existing warnings from unrelated functions
+
+Command: bun run build
+Status: ✓ COMPLETE (compiled successfully in 1718ms)
+TypeScript Check: ✓ PASSED
+Route Generation: ✓ 4/4 pages generated
+
+FILE STRUCTURE VERIFICATION:
+================================================================================
+Line 1: BEGIN;
+Lines 3-43: CTE seed_venues + INSERT INTO venues with RETURNING
+Line 44: SELECT COUNT(*) from inserted venues
+Lines 46-77: INSERT INTO venue_pricing (22 tiers)
+Lines 79-101: INSERT INTO venue_specs (10 specs)
+Lines 103-152: INSERT INTO venue_peripherals (40 peripherals)
+Lines 154-224: INSERT INTO venue_menu_items (60 items)
+Lines 226-266: INSERT INTO venue_images (30 images)
+Line 268: COMMIT;
+
+NOTEPAD VERIFICATION:
+================================================================================
+File: .sisyphus/notepads/pcroom-mvp/learnings.md
+Status: ✓ APPENDED (lines 288-316)
+Content:
+- Korean data patterns (naming, pricing, amenities)
+- PostGIS seeding syntax
+- JSONB seeding patterns
+- Seed data strategy (10 venues, geographic distribution)
+
+KOREAN AUTHENTICITY CHECKLIST:
+================================================================================
+✓ Venue names follow Korean PC bang conventions
+✓ Addresses use road-name format (도로명주소)
+✓ Districts use Korean 구 naming
+✓ Operating hours reflect real patterns (24시간, weekday/weekend)
+✓ Amenities use Korean labels (흡연실, 샤워실, 무료 음료)
+✓ Pricing in KRW matches market rates (1200-1900원/hour)
+✓ Menu items are common Korean PC bang offerings
+✓ Hardware specs match 2024-2025 Korean market
+
+GEOGRAPHIC DISTRIBUTION:
+================================================================================
+North Seoul: 노원구 (Nowon)
+Central: 종로구 (Jongno), 마포구 (Hongdae), 서대문구 (Sinchon)
+East: 광진구 (Konkuk)
+South: 강남구 (Gangnam), 관악구 (Sillim), 구로구 (Guro)
+Southeast: 송파구 (Jamsil)
+Southwest: 영등포구 (Yeongdeungpo)
+
+Coordinates verified within Seoul bounds:
+- Latitude: 37.4841 to 37.6542 ✓
+- Longitude: 126.8874 to 127.1001 ✓
+
+NEXT STEPS (DEPENDENCIES):
+================================================================================
+This task enables:
+- Task 7: Admin CRUD operations (can modify seeded data)
+- Task 9: Map view component (will display 10 seeded venues)
+- Task 10: Venue detail page (can show full details)
+- Task 13: Search/filter testing (can filter by district, price, specs)
+- All future UI tasks have realistic test data
+
+CRITICAL SUCCESS FACTORS:
+================================================================================
+1. Session resume fixed empty file issue effectively
+2. All 6 tables have complete relational data
+3. PostGIS coordinate insertion uses correct (lng, lat) order
+4. JSONB data validates against schema check constraints
+5. Korean text encoding (UTF-8) works correctly
+6. Geographic spread enables radius/nearest query testing
+
+================================================================================
+Task 6 COMPLETE ✓
+Seed data verified, SQL valid, build successful.
+Ready for Wave 2 frontend tasks (map view, detail pages, search/filter).
+================================================================================
