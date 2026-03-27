@@ -1,20 +1,13 @@
-export interface Venue {
-  id: string
-  name: string
-  // PostGIS location usually returns as EWKB hex string or GeoJSON if cast
-  // But our RPC returns GEOGRAPHY(POINT, 4326) directly, which often comes as hex
-  // We'll handle parsing in the component or a utility
-  location: string | { type: string, coordinates: number[] } 
-  address_full: string
-  address_district: string
-  phone: string | null
-  operating_hours: Record<string, string>
-  amenities: string[]
-  total_seats: number | null
-  parking_available: boolean
-  distance_meters: number
-  created_at: string
-  updated_at: string
+import { Database } from './database'
+
+// Derive types from auto-generated database schema
+// Use Omit to override PostGIS GEOGRAPHY 'location' field which is typed as 'unknown'
+type VenueRow = Database['public']['Tables']['venues']['Row']
+
+export type Venue = Omit<VenueRow, 'location'> & {
+  location: string  // PostGIS GEOGRAPHY as EWKB hex string
+  // distance_meters is added by RPC functions (nearby_venues, nearest_venues)
+  distance_meters?: number
 }
 
 export interface Coordinates {
