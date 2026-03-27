@@ -25,6 +25,14 @@ export const metadata: Metadata = {
     type: "website",
     locale: "ko_KR",
     url: "https://banggo.kr",
+    images: [
+      {
+        url: "https://banggo.kr/icons/icon-512x512.png",
+        width: 512,
+        height: 512,
+        alt: "방고 - 서울 PC방 가격비교",
+      },
+    ],
   },
 };
 

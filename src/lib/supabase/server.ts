@@ -20,6 +20,7 @@ export async function createClient() {
             )
           } catch {
             // Server Component — setAll called from Server Component
+            return
           }
         },
       },

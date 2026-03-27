@@ -2,10 +2,12 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ArrowLeft, MapPin, Phone, Clock } from 'lucide-react'
+import { VenueSectionTabs } from '@/components/venue/venue-section-tabs'
 
 type PageParams = {
   params: Promise<{ id: string }>
@@ -37,7 +39,7 @@ export async function generateMetadata({ params }: PageParams): Promise<Metadata
 
   let priceDescription = ''
   if (pricing?.pricing_structure) {
-    const priceStructure = pricing.pricing_structure as any
+    const priceStructure = pricing.pricing_structure as Record<string, unknown>
     const hourlyPrices = Object.values(priceStructure)
       .filter((v): v is number => typeof v === 'number')
     if (hourlyPrices.length > 0) {
@@ -55,6 +57,14 @@ export async function generateMetadata({ params }: PageParams): Promise<Metadata
     openGraph: {
       title: venue.name,
       description: `${venue.address_full} ${priceDescription}`.trim(),
+      images: [
+        {
+          url: "https://banggo.kr/icons/icon-512x512.png",
+          width: 512,
+          height: 512,
+          alt: venue.name,
+        },
+      ],
     },
   }
 }
@@ -97,6 +107,15 @@ export default async function VenueDetailPage({ params }: PageParams) {
 
   // Parse operating hours
   const operatingHours = venue.operating_hours as Record<string, string>
+  const availableSections = [
+    { id: 'basic-info', label: '기본 정보' },
+    pricing && pricing.length > 0 ? { id: 'pricing', label: '가격' } : null,
+    specs ? { id: 'specs', label: '사양' } : null,
+    peripherals && peripherals.length > 0 ? { id: 'peripherals', label: '주변기기' } : null,
+    menuItems && menuItems.length > 0 ? { id: 'menu', label: '메뉴' } : null,
+  ].filter((section): section is { id: string; label: string } => section !== null)
+
+  const menuCategories = Array.from(new Set((menuItems ?? []).map((item) => item.category)))
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -120,17 +139,21 @@ export default async function VenueDetailPage({ params }: PageParams) {
       </div>
 
       <div className="container max-w-4xl mx-auto px-4 py-6 space-y-6">
+        <VenueSectionTabs sections={availableSections} />
+
         {/* Images Section */}
         {images && images.length > 0 && (
           <Card>
             <CardContent className="p-0">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-4">
                 {images.map((img) => (
-                  <div key={img.id} className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
-                    <img 
+                  <div key={img.id} className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                    <Image
                       src={img.image_url} 
                       alt={img.alt_text || venue.name}
-                      className="w-full h-full object-cover"
+                      fill
+                      unoptimized
+                      className="object-cover"
                     />
                   </div>
                 ))}
@@ -140,7 +163,7 @@ export default async function VenueDetailPage({ params }: PageParams) {
         )}
 
         {/* Basic Info Section */}
-        <Card>
+        <Card id="basic-info" className="scroll-mt-32">
           <CardHeader>
             <CardTitle>기본 정보</CardTitle>
           </CardHeader>
@@ -199,14 +222,14 @@ export default async function VenueDetailPage({ params }: PageParams) {
 
         {/* Pricing Section */}
         {pricing && pricing.length > 0 && (
-          <Card>
+          <Card id="pricing" className="scroll-mt-32">
             <CardHeader>
               <CardTitle>가격</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {pricing.map((price) => {
-                  const priceStructure = price.pricing_structure as Record<string, any>
+                  const priceStructure = price.pricing_structure as Record<string, unknown>
                   return (
                     <div key={price.id} className="border-b last:border-b-0 pb-4 last:pb-0">
                       <h3 className="font-semibold text-lg mb-2">{price.tier_name}</h3>
@@ -222,7 +245,7 @@ export default async function VenueDetailPage({ params }: PageParams) {
                         </TableHeader>
                         <TableBody>
                           {Object.entries(priceStructure)
-                            .filter(([_, value]) => typeof value === 'number')
+                            .filter((entry): entry is [string, number] => typeof entry[1] === 'number')
                             .map(([hours, priceValue]) => (
                             <TableRow key={hours}>
                               <TableCell>{hours}</TableCell>
@@ -243,7 +266,7 @@ export default async function VenueDetailPage({ params }: PageParams) {
 
         {/* Specs Section */}
         {specs && (
-          <Card>
+          <Card id="specs" className="scroll-mt-32">
             <CardHeader>
               <CardTitle>사양</CardTitle>
             </CardHeader>
@@ -282,7 +305,7 @@ export default async function VenueDetailPage({ params }: PageParams) {
 
         {/* Peripherals Section */}
         {peripherals && peripherals.length > 0 && (
-          <Card>
+          <Card id="peripherals" className="scroll-mt-32">
             <CardHeader>
               <CardTitle>주변기기</CardTitle>
             </CardHeader>
@@ -309,23 +332,24 @@ export default async function VenueDetailPage({ params }: PageParams) {
 
         {/* Menu Section */}
         {menuItems && menuItems.length > 0 && (
-          <Card>
+          <Card id="menu" className="scroll-mt-32">
             <CardHeader>
               <CardTitle>메뉴</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {['food', 'drink', 'snack'].map((category) => {
+                {menuCategories.map((category) => {
                   const categoryItems = menuItems.filter((item) => item.category === category)
                   if (categoryItems.length === 0) return null
                   
                   return (
                     <div key={category} className="border-b last:border-b-0 pb-4 last:pb-0">
-                      <h3 className="font-semibold text-lg mb-3 capitalize">
-                        {category === 'food' && '음식'}
-                        {category === 'drink' && '음료'}
-                        {category === 'snack' && '간식'}
-                      </h3>
+                        <h3 className="font-semibold text-lg mb-3 capitalize">
+                          {category === 'food' && '음식'}
+                          {category === 'drink' && '음료'}
+                          {category === 'snack' && '간식'}
+                          {!['food', 'drink', 'snack'].includes(category) && category}
+                        </h3>
                       <div className="space-y-2">
                         {categoryItems.map((item) => (
                           <div key={item.id} className="flex justify-between items-center">

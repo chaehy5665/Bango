@@ -1,13 +1,60 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Script from 'next/script'
 import { Venue } from '@/types/venue'
 import { parsePostGISPoint } from '@/utils/geo-parser'
 
+type KakaoLatLng = object
+
+interface KakaoMapInstance {
+  panTo: (latLng: KakaoLatLng) => void
+  setLevel: (level: number) => void
+  getLevel: () => number
+}
+
+interface KakaoMarker {
+  setMap: (map: KakaoMapInstance | null) => void
+}
+
+interface KakaoInfoWindow {
+  close: () => void
+  setContent: (content: string) => void
+  open: (map: KakaoMapInstance, marker: KakaoMarker) => void
+}
+
+interface KakaoMarkerClusterer {
+  clear: () => void
+  addMarkers: (markers: KakaoMarker[]) => void
+}
+
+type KakaoSize = object
+type KakaoMarkerImage = object
+
+interface KakaoMapsNamespace {
+  load: (callback: () => void) => void
+  LatLng: new (lat: number, lng: number) => KakaoLatLng
+  Map: new (container: HTMLElement, options: { center: KakaoLatLng; level: number }) => KakaoMapInstance
+  InfoWindow: new (options: { zIndex: number }) => KakaoInfoWindow
+  MarkerClusterer: new (options: {
+    map: KakaoMapInstance
+    averageCenter: boolean
+    minLevel: number
+    minClusterSize: number
+    gridSize: number
+  }) => KakaoMarkerClusterer
+  Marker: new (options: { position: KakaoLatLng; clickable?: boolean; image?: KakaoMarkerImage }) => KakaoMarker
+  Size: new (width: number, height: number) => KakaoSize
+  MarkerImage: new (src: string, size: KakaoSize) => KakaoMarkerImage
+  event: {
+    addListener: (marker: KakaoMarker, eventName: 'click', handler: () => void) => void
+  }
+}
+
 declare global {
   interface Window {
-    kakao: any
+    kakao: {
+      maps: KakaoMapsNamespace
+    }
   }
 }
 
@@ -29,15 +76,16 @@ export function KakaoMap({
   userLocation
 }: KakaoMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null)
-  const [mapInstance, setMapInstance] = useState<any>(null)
+  const [mapInstance, setMapInstance] = useState<KakaoMapInstance | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
-  const markersRef = useRef<any[]>([])
-  const infoWindowRef = useRef<any>(null)
+  const markersRef = useRef<KakaoMarker[]>([])
+  const clustererRef = useRef<KakaoMarkerClusterer | null>(null)
+  const infoWindowRef = useRef<KakaoInfoWindow | null>(null)
 
   // Load Kakao Maps SDK
   useEffect(() => {
     const script = document.createElement('script')
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY}&autoload=false`
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY}&autoload=false&libraries=clusterer`
     script.async = true
     
     script.onload = () => {
@@ -58,17 +106,24 @@ export function KakaoMap({
     if (!isLoaded || !mapContainer.current) return
 
     const options = {
-      center: new window.kakao.maps.LatLng(center.lat, center.lng),
-      level: zoom
+      center: new window.kakao.maps.LatLng(SEOUL_CENTER.lat, SEOUL_CENTER.lng),
+      level: 3,
     }
     
     const map = new window.kakao.maps.Map(mapContainer.current, options)
     setMapInstance(map)
     
-    // Create InfoWindow once
     infoWindowRef.current = new window.kakao.maps.InfoWindow({ zIndex: 1 })
 
-  }, [isLoaded]) // Only run once when loaded
+    clustererRef.current = new window.kakao.maps.MarkerClusterer({
+      map: map,
+      averageCenter: true,
+      minLevel: 5,
+      minClusterSize: 2,
+      gridSize: 60,
+    })
+
+  }, [isLoaded])
 
   // Update Center when prop changes
   useEffect(() => {
@@ -77,18 +132,24 @@ export function KakaoMap({
     mapInstance.panTo(moveLatLon)
   }, [center, mapInstance])
 
+  useEffect(() => {
+    if (!mapInstance) return
+    mapInstance.setLevel(zoom)
+  }, [mapInstance, zoom])
+
   // Update Markers when venues change
   useEffect(() => {
-    if (!mapInstance || !isLoaded) return
+    if (!mapInstance || !isLoaded || !clustererRef.current) return
     
-    // Clear existing markers
-    markersRef.current.forEach(marker => marker.setMap(null))
+    clustererRef.current.clear()
     markersRef.current = []
+    
+    const newMarkers: KakaoMarker[] = []
     
     venues.forEach(venue => {
       const latLng = typeof venue.location === 'string' 
         ? parsePostGISPoint(venue.location)
-        : venue.location.coordinates ? { lat: venue.location.coordinates[1], lng: venue.location.coordinates[0] } : null
+        : null
 
       if (!latLng) return
 
@@ -99,15 +160,11 @@ export function KakaoMap({
         clickable: true
       })
       
-      marker.setMap(mapInstance)
-      markersRef.current.push(marker)
+      newMarkers.push(marker)
       
-      // Add click event
       window.kakao.maps.event.addListener(marker, 'click', () => {
-        // Close previous info window
-        infoWindowRef.current.close()
+        infoWindowRef.current?.close()
         
-        // Content for InfoWindow
         const content = `
           <div style="padding:15px;min-width:200px;font-family:-apple-system, BlinkMacSystemFont, sans-serif;">
             <h4 style="margin:0 0 5px;font-size:16px;font-weight:bold;">${venue.name}</h4>
@@ -118,12 +175,15 @@ export function KakaoMap({
           </div>
         `
         
-        infoWindowRef.current.setContent(content)
-        infoWindowRef.current.open(mapInstance, marker)
+        infoWindowRef.current?.setContent(content)
+        infoWindowRef.current?.open(mapInstance, marker)
         
         if (onMarkerClick) onMarkerClick(venue)
       })
     })
+    
+    markersRef.current = newMarkers
+    clustererRef.current.addMarkers(newMarkers)
   }, [venues, mapInstance, isLoaded, onMarkerClick])
 
   // User Location Marker

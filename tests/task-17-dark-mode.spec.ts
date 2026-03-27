@@ -21,10 +21,6 @@ test.describe('Task 17: Dark Mode Theme Toggle', () => {
     const toggleButton = page.locator('[data-testid="theme-toggle"]').first();
     
     // Get initial state
-    const initialHasDark = await htmlElement.evaluate(el => 
-      el.classList.contains('dark')
-    );
-    
     // Force click using JavaScript
     await toggleButton.evaluate((el: HTMLElement) => el.click());
     await page.waitForTimeout(500);
@@ -98,14 +94,14 @@ test.describe('Task 17: Dark Mode Theme Toggle', () => {
   test('should work on both mobile and desktop viewports', async ({ page }) => {
     // Test on mobile viewport
     await page.setViewportSize({ width: 375, height: 667 });
-    let mobileToggle = page.locator('[data-testid="theme-toggle"]');
-    let mobileCount = await mobileToggle.count();
+    const mobileToggle = page.locator('[data-testid="theme-toggle"]');
+    const mobileCount = await mobileToggle.count();
     expect(mobileCount).toBeGreaterThan(0);
     
     // Test on desktop viewport
     await page.setViewportSize({ width: 1280, height: 720 });
-    let desktopToggle = page.locator('[data-testid="theme-toggle"]');
-    let desktopCount = await desktopToggle.count();
+    const desktopToggle = page.locator('[data-testid="theme-toggle"]');
+    const desktopCount = await desktopToggle.count();
     expect(desktopCount).toBeGreaterThan(0);
   });
 

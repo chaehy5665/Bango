@@ -29,6 +29,9 @@ test.describe('Admin CRUD', () => {
     await page.fill('input[name="ram_gb"]', '16')
     await page.fill('input[name="storage"]', 'SSD 512GB')
     await page.fill('input[name="monitor"]', '27인치 144Hz')
+    await page.fill('input[name="peripheral_0_brand"]', 'Logitech')
+    await page.fill('input[name="menu_0_item_name"]', '콜라')
+    await page.fill('input[name="menu_0_price_krw"]', '2000')
 
     await page.getByRole('button', { name: '저장' }).click()
     await expect(page).toHaveURL(/\/admin$/)

@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { SlidersHorizontal, X } from 'lucide-react'
+import { SlidersHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
 import { VenueFilters, DEFAULT_FILTERS, DistanceFilter, GPUTier, PeripheralBrand, areFiltersDefault } from '@/types/filters'
@@ -21,6 +21,7 @@ const DISTANCE_OPTIONS: { value: DistanceFilter; label: string }[] = [
   { value: 3000, label: '3km' },
   { value: 5000, label: '5km' },
   { value: 10000, label: '10km' },
+  { value: 50000, label: '전체 (서울)' },
 ]
 
 const GPU_TIERS: { value: GPUTier; label: string }[] = [

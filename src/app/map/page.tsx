@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { KakaoMap } from '@/components/map/kakao-map'
 import { Venue, VenueWithFilterData } from '@/types/venue'
-import { parsePostGISPoint } from '@/utils/geo-parser'
-import { VenueFilters, DEFAULT_FILTERS, meetsGPUTier, isVenueOpen, is24Hour } from '@/types/filters'
+import { VenueFilters, DEFAULT_FILTERS, meetsGPUTier, isVenueOpen, is24Hour, OperatingHours } from '@/types/filters'
 import { FilterPanel } from '@/components/filter/filter-panel'
 
 const SEOUL_CENTER = { lat: 37.5665, lng: 126.9780 }
@@ -57,7 +56,7 @@ export default function MapPage() {
       )
       
       setVenues(venuesWithData)
-    } catch (err: any) {
+    } catch {
       setError('주변 PC방을 불러오는데 실패했습니다.')
     } finally {
       setLoading(false)
@@ -75,7 +74,7 @@ export default function MapPage() {
           setMapCenter(userLoc)
           fetchVenues(latitude, longitude, DEFAULT_FILTERS.distance)
         },
-        (error) => {
+        () => {
           // Fallback to Seoul center
           fetchVenues(SEOUL_CENTER.lat, SEOUL_CENTER.lng, DEFAULT_FILTERS.distance)
         },
@@ -88,13 +87,11 @@ export default function MapPage() {
   }, [])
 
   // Handle filter changes - refetch venues with new distance radius
+  const activeLocation = userLocation ?? SEOUL_CENTER
+
   useEffect(() => {
-    if (userLocation) {
-      fetchVenues(userLocation.lat, userLocation.lng, filters.distance)
-    } else {
-      fetchVenues(SEOUL_CENTER.lat, SEOUL_CENTER.lng, filters.distance)
-    }
-  }, [filters.distance])
+    fetchVenues(activeLocation.lat, activeLocation.lng, filters.distance)
+  }, [activeLocation.lat, activeLocation.lng, filters.distance])
 
   // Apply filters to venues (client-side filtering for non-distance filters)
   const filteredVenues = useMemo(() => {
@@ -103,9 +100,8 @@ export default function MapPage() {
       if (filters.maxPrice !== null && venue.pricing) {
         const hasMatchingPrice = venue.pricing.some(pricing => {
           if (!pricing.pricing_structure) return false
-          const hourlyPrices = Object.entries(pricing.pricing_structure)
-            .filter(([key, value]) => typeof value === 'number')
-            .map(([_, value]) => value as number)
+          const hourlyPrices = Object.values(pricing.pricing_structure)
+            .filter((value): value is number => typeof value === 'number')
           return hourlyPrices.some(price => price <= filters.maxPrice!)
         })
         if (!hasMatchingPrice) return false
@@ -127,11 +123,11 @@ export default function MapPage() {
       
       // Operating hours filters
       if (filters.onlyOpen) {
-        if (!isVenueOpen(venue.operating_hours)) return false
+        if (!isVenueOpen(venue.operating_hours as OperatingHours | null | undefined)) return false
       }
       
       if (filters.only24Hours) {
-        if (!is24Hour(venue.operating_hours)) return false
+        if (!is24Hour(venue.operating_hours as OperatingHours | null | undefined)) return false
       }
       
       return true

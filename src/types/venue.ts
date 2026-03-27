@@ -19,7 +19,7 @@ export interface Coordinates {
 export interface VenueWithFilterData extends Venue {
   pricing?: {
     tier_name: string
-    pricing_structure: any
+    pricing_structure: Record<string, unknown>
   }[]
   specs?: {
     cpu: string

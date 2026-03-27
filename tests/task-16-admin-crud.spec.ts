@@ -1,9 +1,9 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 
 const ADMIN_PASSWORD = 'test-password-123'
 const BASE_URL = 'http://localhost:3000'
 
-async function loginAsAdmin(page: any) {
+async function loginAsAdmin(page: Page) {
   await page.goto(`${BASE_URL}/admin/login`)
   await page.fill('input[name="password"]', ADMIN_PASSWORD)
   await page.click('button[type="submit"]')
@@ -36,6 +36,9 @@ test.describe('Task 16: Admin CRUD Panel', () => {
     await page.fill('input[name="ram_gb"]', '16')
     await page.fill('input[name="storage"]', 'SSD 512GB')
     await page.fill('input[name="monitor"]', '27인치 144Hz')
+    await page.fill('input[name="peripheral_0_brand"]', 'Logitech')
+    await page.fill('input[name="menu_0_item_name"]', '콜라')
+    await page.fill('input[name="menu_0_price_krw"]', '2000')
 
     // Wait for form to be fully interactive before submit
     await page.waitForTimeout(500)

@@ -1,4 +1,4 @@
-export type DistanceFilter = 500 | 1000 | 3000 | 5000 | 10000
+export type DistanceFilter = 500 | 1000 | 3000 | 5000 | 10000 | 50000
 
 export type GPUTier = '3060+' | '4060+' | '4080+'
 
@@ -22,9 +22,14 @@ export interface VenueFilters {
   only24Hours: boolean // Only show 24-hour venues
 }
 
+export interface OperatingHours {
+  weekday?: string
+  weekend?: string
+}
+
 export const DEFAULT_FILTERS: VenueFilters = {
   maxPrice: null,
-  distance: 5000, // Default 5km radius
+  distance: 50000, // Default 50km radius — shows all Seoul venues
   gpuTier: null,
   peripheralBrands: [],
   onlyOpen: false,
@@ -35,7 +40,7 @@ export const DEFAULT_FILTERS: VenueFilters = {
 export function areFiltersDefault(filters: VenueFilters): boolean {
   return (
     filters.maxPrice === null &&
-    filters.distance === 5000 &&
+    filters.distance === 50000 &&
     filters.gpuTier === null &&
     filters.peripheralBrands.length === 0 &&
     filters.onlyOpen === false &&
@@ -60,7 +65,7 @@ export function meetsGPUTier(gpuModel: string, minTier: GPUTier | null): boolean
 }
 
 // Check if venue is currently open
-export function isVenueOpen(operatingHours: any): boolean {
+export function isVenueOpen(operatingHours: OperatingHours | null | undefined): boolean {
   if (!operatingHours || typeof operatingHours !== 'object') return false
   
   const now = new Date()
@@ -83,7 +88,7 @@ export function isVenueOpen(operatingHours: any): boolean {
 }
 
 // Check if venue is 24-hour
-export function is24Hour(operatingHours: any): boolean {
+export function is24Hour(operatingHours: OperatingHours | null | undefined): boolean {
   if (!operatingHours || typeof operatingHours !== 'object') return false
   
   const weekday = operatingHours.weekday as string | undefined

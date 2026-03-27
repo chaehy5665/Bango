@@ -1,7 +1,6 @@
 'use server'
 
 import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
 import { verifyAdmin } from '@/lib/admin-auth'
 
 export async function loginAction(formData: FormData) {

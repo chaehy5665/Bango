@@ -13,8 +13,6 @@ import {
 } from '@/components/ui/table'
 import { DeleteVenueButton } from './delete-button'
 
-type Venue = Database['public']['Tables']['venues']['Row']
-
 function createAdminClient() {
   return createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,7 +25,7 @@ export default async function AdminPage() {
   await requireAdmin()
 
   const supabase = createAdminClient()
-  const { data: venues, error } = await supabase
+  const { data: venues } = await supabase
     .from('venues')
     .select('id, name, address_district, total_seats')
     .order('created_at', { ascending: false })
