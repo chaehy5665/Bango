@@ -14,3 +14,24 @@ export interface Coordinates {
   lat: number
   lng: number
 }
+
+// Extended venue type with pricing, specs, and peripherals for filtering
+export interface VenueWithFilterData extends Venue {
+  pricing?: {
+    tier_name: string
+    pricing_structure: any
+  }[]
+  specs?: {
+    cpu: string
+    gpu: string
+    ram_gb: number
+    storage: string
+    monitor: string
+    internet_speed_mbps?: number
+  } | null
+  peripherals?: {
+    peripheral_type: string
+    brand: string
+    model?: string
+  }[]
+}

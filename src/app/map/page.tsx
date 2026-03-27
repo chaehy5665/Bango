@@ -1,41 +1,63 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { KakaoMap } from '@/components/map/kakao-map'
-import { Venue } from '@/types/venue'
+import { Venue, VenueWithFilterData } from '@/types/venue'
 import { parsePostGISPoint } from '@/utils/geo-parser'
+import { VenueFilters, DEFAULT_FILTERS, meetsGPUTier, isVenueOpen, is24Hour } from '@/types/filters'
+import { FilterPanel } from '@/components/filter/filter-panel'
 
 const SEOUL_CENTER = { lat: 37.5665, lng: 126.9780 }
 
 export default function MapPage() {
   const router = useRouter()
-  const [venues, setVenues] = useState<Venue[]>([])
+  const [venues, setVenues] = useState<VenueWithFilterData[]>([])
   const [loading, setLoading] = useState(true)
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [mapCenter, setMapCenter] = useState(SEOUL_CENTER)
   const [error, setError] = useState<string | null>(null)
+  const [filters, setFilters] = useState<VenueFilters>(DEFAULT_FILTERS)
 
-  const fetchVenues = async (lat: number, lng: number) => {
+  const fetchVenues = async (lat: number, lng: number, radiusMeters: number = 5000) => {
     setLoading(true)
     setError(null)
     const supabase = createClient()
     
     try {
-      const { data, error } = await supabase.rpc('nearby_venues', {
+      // Fetch venues with nearby_venues RPC
+      const { data: venuesData, error: venuesError } = await supabase.rpc('nearby_venues', {
         user_lat: lat,
         user_lng: lng,
-        radius_meters: 5000, // 5km radius to show enough venues
-        limit_count: 50
+        radius_meters: radiusMeters,
+        limit_count: 100 // Fetch more venues to allow filtering
       })
 
-      if (error) throw error
+      if (venuesError) throw venuesError
       
-      console.log('Fetched venues:', data)
-      setVenues(data || [])
+      const venueList = (venuesData || []) as Venue[]
+      
+      // Fetch pricing, specs, and peripherals for all venues in parallel
+      const venuesWithData = await Promise.all(
+        venueList.map(async (venue) => {
+          const [pricingRes, specsRes, peripheralsRes] = await Promise.all([
+            supabase.from('venue_pricing').select('tier_name, pricing_structure').eq('venue_id', venue.id),
+            supabase.from('venue_specs').select('cpu, gpu, ram_gb, storage, monitor, internet_speed_mbps').eq('venue_id', venue.id).single(),
+            supabase.from('venue_peripherals').select('peripheral_type, brand, model').eq('venue_id', venue.id)
+          ])
+          
+          return {
+            ...venue,
+            pricing: pricingRes.data || [],
+            specs: specsRes.data || null,
+            peripherals: peripheralsRes.data || []
+          } as VenueWithFilterData
+        })
+      )
+      
+      setVenues(venuesWithData)
     } catch (err: any) {
-      console.error('Error fetching venues:', err)
       setError('주변 PC방을 불러오는데 실패했습니다.')
     } finally {
       setLoading(false)
@@ -51,28 +73,86 @@ export default function MapPage() {
           const userLoc = { lat: latitude, lng: longitude }
           setUserLocation(userLoc)
           setMapCenter(userLoc)
-          fetchVenues(latitude, longitude)
+          fetchVenues(latitude, longitude, DEFAULT_FILTERS.distance)
         },
         (error) => {
-          console.log('Geolocation denied or failed:', error)
           // Fallback to Seoul center
-          fetchVenues(SEOUL_CENTER.lat, SEOUL_CENTER.lng)
+          fetchVenues(SEOUL_CENTER.lat, SEOUL_CENTER.lng, DEFAULT_FILTERS.distance)
         },
         { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
       )
     } else {
       // Fallback if geolocation not supported
-      fetchVenues(SEOUL_CENTER.lat, SEOUL_CENTER.lng)
+      fetchVenues(SEOUL_CENTER.lat, SEOUL_CENTER.lng, DEFAULT_FILTERS.distance)
     }
   }, [])
 
+  // Handle filter changes - refetch venues with new distance radius
+  useEffect(() => {
+    if (userLocation) {
+      fetchVenues(userLocation.lat, userLocation.lng, filters.distance)
+    } else {
+      fetchVenues(SEOUL_CENTER.lat, SEOUL_CENTER.lng, filters.distance)
+    }
+  }, [filters.distance])
+
+  // Apply filters to venues (client-side filtering for non-distance filters)
+  const filteredVenues = useMemo(() => {
+    return venues.filter(venue => {
+      // Price filter: Check if ANY pricing tier has hourly price <= maxPrice
+      if (filters.maxPrice !== null && venue.pricing) {
+        const hasMatchingPrice = venue.pricing.some(pricing => {
+          if (!pricing.pricing_structure) return false
+          const hourlyPrices = Object.entries(pricing.pricing_structure)
+            .filter(([key, value]) => typeof value === 'number')
+            .map(([_, value]) => value as number)
+          return hourlyPrices.some(price => price <= filters.maxPrice!)
+        })
+        if (!hasMatchingPrice) return false
+      }
+      
+      // GPU filter
+      if (filters.gpuTier !== null && venue.specs) {
+        if (!meetsGPUTier(venue.specs.gpu, filters.gpuTier)) return false
+      }
+      
+      // Peripheral filter: Check if ANY peripheral matches selected brands
+      if (filters.peripheralBrands.length > 0 && venue.peripherals) {
+        const validBrands: string[] = filters.peripheralBrands
+        const hasMatchingPeripheral = venue.peripherals.some(peripheral =>
+          validBrands.includes(peripheral.brand)
+        )
+        if (!hasMatchingPeripheral) return false
+      }
+      
+      // Operating hours filters
+      if (filters.onlyOpen) {
+        if (!isVenueOpen(venue.operating_hours)) return false
+      }
+      
+      if (filters.only24Hours) {
+        if (!is24Hour(venue.operating_hours)) return false
+      }
+      
+      return true
+    })
+  }, [venues, filters])
+
+
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col md:flex-row h-screen bg-gray-50">
       {/* Header/Nav would go here */}
+      {/* Filter Panel */}
+      <FilterPanel 
+        filters={filters} 
+        onFiltersChange={setFilters}
+        venueCount={filteredVenues.length}
+      />
+      
       
       <main className="flex-1 relative">
         <KakaoMap 
-          venues={venues} 
+          venues={filteredVenues} 
           center={mapCenter} 
           zoom={4} 
           userLocation={userLocation}
@@ -93,9 +173,15 @@ export default function MapPage() {
         )}
         
         {/* Venue Count Badge */}
-        {!loading && !error && venues.length > 0 && (
+        {!loading && !error && filteredVenues.length > 0 && (
           <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-white px-4 py-2 rounded-full shadow-md z-20 text-sm font-medium text-gray-700">
-            주변 {venues.length}개의 PC방 발견
+            주변 {filteredVenues.length}개의 PC방 발견
+          </div>
+        )}
+        
+        {!loading && !error && venues.length > 0 && filteredVenues.length === 0 && (
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-amber-50 text-amber-700 px-4 py-2 rounded-full shadow-md z-20 text-sm font-medium">
+            필터 조건에 맞는 PC방이 없습니다
           </div>
         )}
       </main>
