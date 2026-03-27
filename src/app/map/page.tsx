@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { KakaoMap } from '@/components/map/kakao-map'
 import { Venue } from '@/types/venue'
@@ -9,6 +10,7 @@ import { parsePostGISPoint } from '@/utils/geo-parser'
 const SEOUL_CENTER = { lat: 37.5665, lng: 126.9780 }
 
 export default function MapPage() {
+  const router = useRouter()
   const [venues, setVenues] = useState<Venue[]>([])
   const [loading, setLoading] = useState(true)
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
@@ -74,7 +76,7 @@ export default function MapPage() {
           center={mapCenter} 
           zoom={4} 
           userLocation={userLocation}
-          onMarkerClick={(venue) => console.log('Clicked venue:', venue)}
+          onMarkerClick={(venue) => router.push(`/venues/${venue.id}`)}
         />
         
         {loading && (
