@@ -23,3 +23,8 @@
 
 - Build logs showed a successful Next.js 16 production build on Vercel.
 - The deployment was aliased to the stable production URL `https://bango-tau.vercel.app`.
+
+## Follow-up operations
+
+- Persistent Vercel production environment variables were configured for Supabase, admin auth, and Kakao Maps.
+- A GitHub-owner-authored follow-up commit was prepared to trigger Git-based Vercel deployment on the Hobby team scope, which rejects non-member commit authors.
