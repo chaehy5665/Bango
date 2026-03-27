@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "db:types": "bunx supabase gen types --lang=typescript --linked > src/types/database.ts"
+    "db:types": "bunx supabase gen types --lang=typescript --linked > src/types/database.ts",
+    "test:e2e": "bunx playwright test"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
