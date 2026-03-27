@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Map, Search, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from '@/components/theme/theme-toggle';
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -42,6 +43,9 @@ export function BottomNav() {
               </Link>
             );
           })}
+          <div className="flex items-center justify-center flex-1 py-2">
+            <ThemeToggle />
+          </div>
         </div>
       </nav>
 
@@ -67,6 +71,9 @@ export function BottomNav() {
               </Link>
             );
           })}
+          <div className="ml-auto">
+            <ThemeToggle />
+          </div>
         </div>
       </nav>
 
