@@ -1,0 +1,69 @@
+=== Task 8: TypeScript Types Generation Evidence ===
+
+1. Database types script added to package.json:
+    "db:types": "bunx supabase gen types --lang=typescript --linked > src/types/database.ts"
+
+2. Generated database.ts file stats:
+    1441 src/types/database.ts
+
+3. Venues table type definition (auto-generated):
+      venues: {
+        Row: {
+          address_district: string
+          address_full: string
+          amenities: string[]
+          created_at: string
+          id: string
+          location: unknown
+          name: string
+          operating_hours: Json
+          parking_available: boolean
+          phone: string | null
+          total_seats: number | null
+          updated_at: string
+        }
+        Insert: {
+--
+      nearby_venues: {
+        Args: {
+          limit_count?: number
+
+4. Type override in venue.ts to handle PostGIS GEOGRAPHY:
+import { Database } from './database'
+
+// Derive types from auto-generated database schema
+// Use Omit to override PostGIS GEOGRAPHY 'location' field which is typed as 'unknown'
+type VenueRow = Database['public']['Tables']['venues']['Row']
+
+export type Venue = Omit<VenueRow, 'location'> & {
+  location: string  // PostGIS GEOGRAPHY as EWKB hex string
+  // distance_meters is added by RPC functions (nearby_venues, nearest_venues)
+  distance_meters?: number
+}
+
+export interface Coordinates {
+  lat: number
+  lng: number
+}
+
+5. Build verification (TypeScript compilation):
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+✓ Compiled successfully in 2.0s
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/5) ...
+  Generating static pages using 9 workers (1/5) 
+  Generating static pages using 9 workers (2/5) 
+  Generating static pages using 9 workers (3/5) 
+✓ Generating static pages using 9 workers (5/5) in 232.5ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+└ ○ /map
+
+
+○  (Static)  prerendered as static content
+

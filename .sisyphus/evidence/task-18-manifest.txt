@@ -1,0 +1,25 @@
+{
+  "name": "방고 - 서울 PC방 가격비교",
+  "short_name": "방고",
+  "description": "서울 지역 PC방 가격 및 사양 비교 서비스",
+  "start_url": "/map",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1e293b",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

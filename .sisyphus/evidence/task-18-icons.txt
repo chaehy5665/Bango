@@ -1,0 +1,36 @@
+=== Manifest Verification ===
+
+Icon Files:
+total 16
+-rw-r--r--  1 c10  staff   547B Mar  3 00:54 icon-192x192.png
+-rw-r--r--  1 c10  staff   1.8K Mar  3 00:54 icon-512x512.png
+
+Icon file types:
+/Users/c10/pcroom/public/icons/icon-192x192.png: PNG image data, 192 x 192, 8-bit/color RGB, non-interlaced
+/Users/c10/pcroom/public/icons/icon-512x512.png: PNG image data, 512 x 512, 8-bit/color RGB, non-interlaced
+/Users/c10/pcroom/public/favicon.ico: PNG image data, 192 x 192, 8-bit/color RGB, non-interlaced
+
+Manifest endpoint checks:
+Name: 방고 - 서울 PC방 가격비교
+Short name: 방고
+Start URL: /map
+Display: standalone
+Theme color: #1e293b
+Number of icons: 2
+Icons details:
+[
+  {
+    "src": "/icons/icon-192x192.png",
+    "sizes": "192x192",
+    "type": "image/png",
+    "purpose": "any"
+  },
+  {
+    "src": "/icons/icon-512x512.png",
+    "sizes": "512x512",
+    "type": "image/png",
+    "purpose": "any"
+  }
+]
+
+✓ All verification passed

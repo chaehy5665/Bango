@@ -1,0 +1,49 @@
+56b9ff1 chore: initial commit — Next.js 16 scaffold, Supabase PostGIS schema, seed data, Kakao Maps view
+commit 56b9ff1b73f99544e441ef71935fa00fd7f4feb8
+Author: Sisyphus <clio-agent@sisyphuslabs.ai>
+Date:   Mon Mar 2 22:19:26 2026 +0900
+
+    chore: initial commit — Next.js 16 scaffold, Supabase PostGIS schema, seed data, Kakao Maps view
+
+ .gitignore                                         |   41 +
+ .sisyphus/boulder.json                             |    9 +
+ .sisyphus/evidence/task-2-scaffold-build.txt       |   56 +
+ .sisyphus/evidence/task-3-supabase-postgis.txt     |  140 +
+ .sisyphus/evidence/task-4-schema-migration.txt     |  135 +
+ .sisyphus/evidence/task-5-geo-rpc-functions.txt    |  161 +
+ .sisyphus/evidence/task-6-seed-data.txt            |  164 +
+ .sisyphus/notepads/pcroom-mvp/learnings.md         |  323 +
+ .sisyphus/plans/pcroom-mvp.md                      | 1301 +++
+ README.md                                          |   36 +
+ bun.lock                                           | 1618 ++++
+ components.json                                    |   23 +
+ eslint.config.mjs                                  |   18 +
+ next.config.ts                                     |    7 +
+ package-lock.json                                  | 9618 ++++++++++++++++++++
+ package.json                                       |   46 +
+ postcss.config.mjs                                 |    7 +
+ public/file.svg                                    |    1 +
+ public/globe.svg                                   |    1 +
+ public/next.svg                                    |    1 +
+ public/vercel.svg                                  |    1 +
+ public/window.svg                                  |    1 +
+ src/app/favicon.ico                                |  Bin 0 -> 25931 bytes
+ src/app/globals.css                                |  126 +
+ src/app/layout.tsx                                 |   34 +
+ src/app/map/page.tsx                               |  102 +
+ src/app/page.tsx                                   |   65 +
+ src/components/map/kakao-map.tsx                   |  201 +
+ src/lib/query-client.ts                            |   15 +
+ src/lib/supabase/client.ts                         |    8 +
+ src/lib/supabase/server.ts                         |   27 +
+ src/lib/utils.ts                                   |    6 +
+ src/types/venue.ts                                 |   23 +
+ src/utils/geo-parser.ts                            |   57 +
+ supabase/.gitignore                                |    8 +
+ supabase/config.toml                               |  295 +
+ .../migrations/20260302111633_enable_postgis.sql   |    2 +
+ .../20260302112153_create_venue_schema.sql         |  135 +
+ .../20260302112653_create_geo_rpc_functions.sql    |  107 +
+ .../20260302113127_seed_initial_venues.sql         |  268 +
+ tsconfig.json                                      |   34 +
+ 41 files changed, 15221 insertions(+)

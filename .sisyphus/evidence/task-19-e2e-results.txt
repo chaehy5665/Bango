@@ -1,0 +1,33 @@
+[2m[WebServer] [22m[0m[2m[35m$[0m [2m[1mnext dev[0m
+[2m[WebServer] [22m[33m[1m⚠[22m[39m Warning: Next.js inferred your workspace root, but it may not be correct.
+[2m[WebServer] [22m We detected multiple lockfiles and selected the directory of /Users/c10/package-lock.json as the root directory.
+[2m[WebServer] [22m To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+[2m[WebServer] [22m   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+[2m[WebServer] [22m Detected additional lockfiles: 
+[2m[WebServer] [22m   * /Users/c10/pcroom/package-lock.json
+[2m[WebServer] [22m
+[2m[WebServer] [22mDebugger listening on ws://127.0.0.1:54611/a73ee956-bd74-4ff7-83fd-2ce940ee4e4e
+[2m[WebServer] [22mFor help, see: https://nodejs.org/en/docs/inspector
+[2m[WebServer] [22mDebugger attached.
+
+Running 16 tests using 5 workers
+
+  ✓   5 [chromium-mobile] › e2e/pwa.spec.ts:4:7 › PWA Manifest › manifest 응답 및 아이콘 파일 확인 (83ms)
+  -   1 [chromium-mobile] › e2e/admin.spec.ts:4:7 › Admin CRUD › 로그인 후 생성/수정/삭제 동작
+  ✓   2 [chromium-mobile] › e2e/dark-mode.spec.ts:4:7 › Dark Mode › 테마 전환 및 가독성 확인 (829ms)
+  ✓   4 [chromium-mobile] › e2e/responsive.spec.ts:4:7 › Responsive Layout › 375px 모바일 레이아웃에서 하단 네비 표시 (872ms)
+  ✓   8 [chromium-mobile] › e2e/venue-detail.spec.ts:4:7 › Venue Detail › 상세 페이지 렌더링 및 주요 섹션 표시 (88ms)
+  ✓   3 [chromium-mobile] › e2e/map.spec.ts:10:7 › Map Interaction › 지도 페이지 로드, 마커 표시, 마커 클릭 이동 (1.6s)
+  ✓   7 [chromium-mobile] › e2e/search-filter.spec.ts:29:7 › Search and Filter › 필터 토글 적용 시 결과 수 변경 (1.8s)
+  -   9 [chromium-desktop] › e2e/admin.spec.ts:4:7 › Admin CRUD › 로그인 후 생성/수정/삭제 동작
+  ✓   6 [chromium-mobile] › e2e/search-filter.spec.ts:4:7 › Search and Filter › 검색어 입력 후 결과 선택 이동 (2.0s)
+  ✓  10 [chromium-desktop] › e2e/dark-mode.spec.ts:4:7 › Dark Mode › 테마 전환 및 가독성 확인 (365ms)
+  ✓  11 [chromium-desktop] › e2e/responsive.spec.ts:4:7 › Responsive Layout › 375px 모바일 레이아웃에서 하단 네비 표시 (346ms)
+  ✓  13 [chromium-desktop] › e2e/venue-detail.spec.ts:4:7 › Venue Detail › 상세 페이지 렌더링 및 주요 섹션 표시 (99ms)
+  ✓  15 [chromium-desktop] › e2e/pwa.spec.ts:4:7 › PWA Manifest › manifest 응답 및 아이콘 파일 확인 (43ms)
+  ✓  12 [chromium-desktop] › e2e/search-filter.spec.ts:29:7 › Search and Filter › 필터 토글 적용 시 결과 수 변경 (402ms)
+  ✓  14 [chromium-desktop] › e2e/map.spec.ts:10:7 › Map Interaction › 지도 페이지 로드, 마커 표시, 마커 클릭 이동 (378ms)
+  ✓  16 [chromium-desktop] › e2e/search-filter.spec.ts:4:7 › Search and Filter › 검색어 입력 후 결과 선택 이동 (972ms)
+
+  2 skipped
+  14 passed (7.6s)

@@ -1,0 +1,77 @@
+# Task 11 QA Evidence Report
+
+## Scenario 1: Landing Page Rendering
+
+**Preconditions:**
+- bun run dev started
+- Server listening on http://localhost:3000
+
+**Test Results:**
+✓ PASS: Landing page renders successfully
+✓ PASS: "방고" title text found in HTML
+✓ PASS: "서울 PC방 가격비교" subtitle found in HTML
+✓ PASS: "서울 50+개 PC방 가격 비교" statistics text found in HTML
+✓ PASS: "지도에서 찾아보기" CTA button text found in HTML
+✓ PASS: CTA button href="/map" correctly links to /map route
+
+**HTML Elements Verified:**
+- <h1 class="text-4xl md:text-6xl font-bold tracking-tight mb-4">방고</h1>
+- <h2 class="text-xl md:text-2xl font-semibold text-muted-foreground mb-6">서울 PC방 가격비교</h2>
+- <p class="text-base md:text-lg text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">서울의 모든 PC방을 한 곳에서 비교하고 찾아보세요...</p>
+- <div class="mb-12 p-4 rounded-lg bg-card border border-border">서울 50+개 PC방 가격 비교</div>
+- <a class="inline-flex items-center justify-center h-12 px-8 rounded-full bg-primary text-primary-foreground font-medium transition-colors hover:opacity-90 active:opacity-80 touch-target" href="/map">지도에서 찾아보기</a>
+
+**Responsive Design Verification:**
+✓ Mobile-first design: px-4 py-16 base classes
+✓ Desktop spacing: md:py-24 variant
+✓ H1 responsive: text-4xl md:text-6xl
+✓ H2 responsive: text-xl md:text-2xl
+✓ Touch-friendly button: h-12 (48px height)
+
+## Scenario 2: Boilerplate Removal
+
+**Files Removed:**
+✓ PASS: file.svg removed
+✓ PASS: globe.svg removed
+✓ PASS: next.svg removed
+✓ PASS: vercel.svg removed
+✓ PASS: window.svg removed
+
+**Boilerplate Text Verification:**
+✓ PASS: "Create Next App" NOT found in src/app/page.tsx
+✓ PASS: "To get started" NOT found in src/app/page.tsx
+✓ PASS: Old boilerplate fully replaced
+
+**Public Directory Contents (Post-Cleanup):**
+- favicon.svg (new Korean PC bang icon)
+
+## Scenario 3: Build Verification
+
+**Command:** bun run build
+**Result:** ✓ SUCCESS (0 errors)
+**Output:**
+- ✓ Compiled successfully in 2.3s
+- ✓ Running TypeScript...
+- ✓ Collecting page data using 9 workers...
+- ✓ Generating static pages (5/5)
+- ✓ Final page optimization...
+
+**Route Status:**
+- / (○ Static, prerendered as static content)
+- /map (○ Static, prerendered as static content)
+
+## Overall QA Result: PASS ✓
+
+All acceptance criteria met:
+✓ Landing page renders with hero section
+✓ Korean title "방고" displayed
+✓ Subtitle "서울 PC방 가격비교" displayed
+✓ Service description present
+✓ Statistics "서울 50+개 PC방 가격 비교" displayed
+✓ CTA button "지도에서 찾아보기" links to /map
+✓ Mobile-first responsive design
+✓ Default SVGs removed
+✓ New favicon added
+✓ No boilerplate text
+✓ Build passes with 0 errors
+✓ TypeScript compilation successful

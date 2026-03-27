@@ -1,0 +1,41 @@
+$ next build
+⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /Users/c10/package-lock.json as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * /Users/c10/pcroom/package-lock.json
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env
+
+  Creating an optimized production build ...
+Debugger listening on ws://127.0.0.1:55578/1aa8d7cf-f4f7-4559-87cc-a2e9882be3dd
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger attached.
+✓ Compiled successfully in 1958.2ms
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/10) ...
+  Generating static pages using 9 workers (2/10) 
+  Generating static pages using 9 workers (4/10) 
+  Generating static pages using 9 workers (7/10) 
+✓ Generating static pages using 9 workers (10/10) in 155.1ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /admin
+├ ○ /admin/login
+├ ƒ /admin/venues/[id]/edit
+├ ƒ /admin/venues/new
+├ ○ /manifest.webmanifest
+├ ○ /map
+├ ○ /search
+└ ƒ /venues/[id]
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

@@ -1,0 +1,28 @@
+- generic [active] [ref=e1]:
+  - main [ref=e3]:
+    - generic [ref=e6]:
+      - button "My Location" [ref=e7]:
+        - img [ref=e8]
+      - generic [ref=e11]:
+        - button "Zoom In" [ref=e12]:
+          - img [ref=e13]
+        - button "Zoom Out" [ref=e14]:
+          - img [ref=e15]
+    - generic [ref=e45]: 주변 7개의 PC방 발견
+  - navigation [ref=e19]:
+    - generic [ref=e20]:
+      - link "지도" [ref=e21] [cursor=pointer]:
+        - /url: /map
+        - img [ref=e22]
+        - generic [ref=e24]: 지도
+      - link "검색" [ref=e25] [cursor=pointer]:
+        - /url: /search
+        - img [ref=e26]
+        - generic [ref=e29]: 검색
+      - link "어드민" [ref=e30] [cursor=pointer]:
+        - /url: /admin
+        - img [ref=e31]
+        - generic [ref=e34]: 어드민
+  - button "Open Next.js Dev Tools" [ref=e40] [cursor=pointer]:
+    - img [ref=e41]
+  - alert [ref=e44]

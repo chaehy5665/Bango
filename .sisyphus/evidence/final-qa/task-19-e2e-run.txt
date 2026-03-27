@@ -1,0 +1,76 @@
+$ bunx playwright test
+
+Running 16 tests using 5 workers
+
+[1A[2K[1/16] [chromium-mobile] › e2e/admin.spec.ts:4:7 › Admin CRUD › 로그인 후 생성/수정/삭제 동작
+[1A[2K[2/16] [chromium-mobile] › e2e/pwa.spec.ts:4:7 › PWA Manifest › manifest 응답 및 아이콘 파일 확인
+[1A[2K[3/16] [chromium-mobile] › e2e/map.spec.ts:10:7 › Map Interaction › 지도 페이지 로드, 마커 표시, 마커 클릭 이동
+[1A[2K[4/16] [chromium-mobile] › e2e/dark-mode.spec.ts:4:7 › Dark Mode › 테마 전환 및 가독성 확인
+[1A[2K[5/16] [chromium-mobile] › e2e/responsive.spec.ts:4:7 › Responsive Layout › 375px 모바일 레이아웃에서 하단 네비 표시
+[1A[2K[6/16] [chromium-mobile] › e2e/search-filter.spec.ts:4:7 › Search and Filter › 검색어 입력 후 결과 선택 이동
+[1A[2K[7/16] [chromium-mobile] › e2e/search-filter.spec.ts:29:7 › Search and Filter › 필터 토글 적용 시 결과 수 변경
+[1A[2K[8/16] [chromium-mobile] › e2e/venue-detail.spec.ts:4:7 › Venue Detail › 상세 페이지 렌더링 및 주요 섹션 표시
+[1A[2K[9/16] [chromium-desktop] › e2e/admin.spec.ts:4:7 › Admin CRUD › 로그인 후 생성/수정/삭제 동작
+[1A[2K[10/16] [chromium-desktop] › e2e/dark-mode.spec.ts:4:7 › Dark Mode › 테마 전환 및 가독성 확인
+[1A[2K[11/16] [chromium-desktop] › e2e/pwa.spec.ts:4:7 › PWA Manifest › manifest 응답 및 아이콘 파일 확인
+[1A[2K[12/16] [chromium-desktop] › e2e/responsive.spec.ts:4:7 › Responsive Layout › 375px 모바일 레이아웃에서 하단 네비 표시
+[1A[2K[13/16] [chromium-desktop] › e2e/map.spec.ts:10:7 › Map Interaction › 지도 페이지 로드, 마커 표시, 마커 클릭 이동
+[1A[2K[14/16] [chromium-desktop] › e2e/search-filter.spec.ts:4:7 › Search and Filter › 검색어 입력 후 결과 선택 이동
+[1A[2K[15/16] [chromium-desktop] › e2e/search-filter.spec.ts:29:7 › Search and Filter › 필터 토글 적용 시 결과 수 변경
+[1A[2K[16/16] [chromium-desktop] › e2e/venue-detail.spec.ts:4:7 › Venue Detail › 상세 페이지 렌더링 및 주요 섹션 표시
+[1A[2K  1) [chromium-mobile] › e2e/search-filter.spec.ts:4:7 › Search and Filter › 검색어 입력 후 결과 선택 이동 ─────
+
+    Error: [2mexpect([22m[31mpage[39m[2m).[22mtoHaveURL[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Expected pattern: [32m/\/venues\//[39m
+    Received string:  [31m"http://localhost:3000/search"[39m
+    Timeout: 5000ms
+
+    Call log:
+    [2m  - Expect "toHaveURL" with timeout 5000ms[22m
+    [2m    9 × unexpected value "http://localhost:3000/search"[22m
+
+
+      24 |
+      25 |     await page.getByRole('button', { name: /홍대 게이밍존 PC방/ }).click()
+    > 26 |     await expect(page).toHaveURL(/\/venues\//)
+         |                        ^
+      27 |   })
+      28 |
+      29 |   test('필터 토글 적용 시 결과 수 변경', async ({ page }) => {
+        at /Users/c10/pcroom/e2e/search-filter.spec.ts:26:24
+
+    Error Context: test-results/search-filter-Search-and-Filter-검색어-입력-후-결과-선택-이동-chromium-mobile/error-context.md
+
+
+[1A[2K  2) [chromium-mobile] › e2e/map.spec.ts:10:7 › Map Interaction › 지도 페이지 로드, 마커 표시, 마커 클릭 이동 ───────
+
+    Error: [2mexpect([22m[31mpage[39m[2m).[22mtoHaveURL[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Expected pattern: [32m/\/venues\//[39m
+    Received string:  [31m""[39m
+    Timeout: 5000ms
+
+    Call log:
+    [2m  - Expect "toHaveURL" with timeout 5000ms[22m
+    [2m    - waiting for" http://localhost:3000/venues/11111111-1111-1111-1111-111111111111" navigation to finish...[22m
+
+
+      88 |     })
+      89 |
+    > 90 |     await expect(page).toHaveURL(/\/venues\//)
+         |                        ^
+      91 |   })
+      92 | })
+      93 |
+        at /Users/c10/pcroom/e2e/map.spec.ts:90:24
+
+    Error Context: test-results/map-Map-Interaction-지도-페이지-로드-마커-표시-마커-클릭-이동-chromium-mobile/error-context.md
+
+
+[1A[2K  2 failed
+    [chromium-mobile] › e2e/map.spec.ts:10:7 › Map Interaction › 지도 페이지 로드, 마커 표시, 마커 클릭 이동 ────────
+    [chromium-mobile] › e2e/search-filter.spec.ts:4:7 › Search and Filter › 검색어 입력 후 결과 선택 이동 ──────
+  2 skipped
+  12 passed (9.3s)
+error: script "test:e2e" exited with code 1
