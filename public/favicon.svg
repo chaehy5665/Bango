@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Background -->
+  <rect width="256" height="256" fill="#000000"/>
+  
+  <!-- Computer Monitor -->
+  <rect x="48" y="40" width="160" height="120" rx="8" fill="none" stroke="#ffffff" stroke-width="8"/>
+  
+  <!-- Screen glow -->
+  <rect x="56" y="48" width="144" height="104" rx="4" fill="#0066ff" opacity="0.3"/>
+  
+  <!-- Monitor stand -->
+  <rect x="108" y="160" width="40" height="32" fill="#ffffff"/>
+  <rect x="64" y="192" width="128" height="8" fill="#ffffff"/>
+  
+  <!-- Korean character "방" (bang) - minimal -->
+  <text x="128" y="120" font-size="48" font-weight="bold" fill="#00ff00" text-anchor="middle" font-family="system-ui, -apple-system">방</text>
+</svg>
