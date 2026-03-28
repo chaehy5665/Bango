@@ -20,6 +20,49 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## PC Bang Venue Data Operations
+
+This project includes a venue data collection and import pipeline for PC Bang (internet cafe) venues in South Korea.
+
+### Quick Start
+
+Run the full pipeline (dry-run):
+
+```bash
+# GetO source
+bun run crawl:run -- --source geto
+
+# Pica source (with limit for testing)
+bun run crawl:run -- --source pica --seoul-only --limit 10
+```
+
+For production imports (writes to database), add `--apply`:
+
+```bash
+bun run crawl:run -- --source geto --apply
+```
+
+### Documentation
+
+See the full operations runbook: [docs/ops/pcbang-venue-ops.md](docs/ops/pcbang-venue-ops.md)
+
+Topics covered:
+- Prerequisites and environment setup
+- Command reference and flags
+- Usage examples for GetO and Pica sources
+- Artifact layout and output structure
+- Troubleshooting common issues
+
+### Individual Stage Commands
+
+The orchestrator wraps five stages. You can also run them individually:
+
+- `bun run crawl:raw-collect` — Stage 1: Raw HTTP collection
+- `bun run crawl:pica-followup` — Stage 2: Pica follow-up detail collection
+- `bun run crawl:parse-raw` — Stage 3: Parse raw captures to canonical format
+- `bun run crawl:classify-load-policy` — Stage 4: Classify venues for insertability
+- `bun run crawl:import-venues` — Stage 5: Import venues to database
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

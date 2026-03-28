@@ -37,23 +37,60 @@ export default function MapPage() {
       
       const venueList = (venuesData || []) as Venue[]
       
-      // Fetch pricing, specs, and peripherals for all venues in parallel
-      const venuesWithData = await Promise.all(
-        venueList.map(async (venue) => {
-          const [pricingRes, specsRes, peripheralsRes] = await Promise.all([
-            supabase.from('venue_pricing').select('tier_name, pricing_structure').eq('venue_id', venue.id),
-            supabase.from('venue_specs').select('cpu, gpu, ram_gb, storage, monitor, internet_speed_mbps').eq('venue_id', venue.id).single(),
-            supabase.from('venue_peripherals').select('peripheral_type, brand, model').eq('venue_id', venue.id)
-          ])
-          
-          return {
-            ...venue,
-            pricing: pricingRes.data || [],
-            specs: specsRes.data || null,
-            peripherals: peripheralsRes.data || []
-          } as VenueWithFilterData
+      if (venueList.length === 0) {
+        setVenues([])
+        return
+      }
+
+      const venueIds = venueList.map(v => v.id)
+
+      const [pricingRes, specsRes, peripheralsRes] = await Promise.all([
+        supabase.from('venue_pricing').select('venue_id, tier_name, pricing_structure').in('venue_id', venueIds),
+        supabase.from('venue_specs').select('venue_id, cpu, gpu, ram_gb, storage, monitor, internet_speed_mbps').in('venue_id', venueIds),
+        supabase.from('venue_peripherals').select('venue_id, peripheral_type, brand, model').in('venue_id', venueIds)
+      ])
+
+      const pricingByVenue = new Map<string, { tier_name: string; pricing_structure: Record<string, unknown> }[]>()
+      for (const pricing of pricingRes.data || []) {
+        if (!pricingByVenue.has(pricing.venue_id)) {
+          pricingByVenue.set(pricing.venue_id, [])
+        }
+        pricingByVenue.get(pricing.venue_id)!.push({
+          tier_name: pricing.tier_name,
+          pricing_structure: pricing.pricing_structure as Record<string, unknown>
         })
-      )
+      }
+
+      const specsByVenue = new Map<string, { cpu: string; gpu: string; ram_gb: number; storage: string; monitor: string; internet_speed_mbps?: number }>()
+      for (const spec of specsRes.data || []) {
+        specsByVenue.set(spec.venue_id, {
+          cpu: spec.cpu,
+          gpu: spec.gpu,
+          ram_gb: spec.ram_gb,
+          storage: spec.storage,
+          monitor: spec.monitor,
+          internet_speed_mbps: spec.internet_speed_mbps ?? undefined
+        })
+      }
+
+      const peripheralsByVenue = new Map<string, { peripheral_type: string; brand: string; model?: string }[]>()
+      for (const peripheral of peripheralsRes.data || []) {
+        if (!peripheralsByVenue.has(peripheral.venue_id)) {
+          peripheralsByVenue.set(peripheral.venue_id, [])
+        }
+        peripheralsByVenue.get(peripheral.venue_id)!.push({
+          peripheral_type: peripheral.peripheral_type,
+          brand: peripheral.brand,
+          model: peripheral.model ?? undefined
+        })
+      }
+
+      const venuesWithData = venueList.map(venue => ({
+        ...venue,
+        pricing: pricingByVenue.get(venue.id) || [],
+        specs: specsByVenue.get(venue.id) || null,
+        peripherals: peripheralsByVenue.get(venue.id) || []
+      } as VenueWithFilterData))
       
       setVenues(venuesWithData)
     } catch {

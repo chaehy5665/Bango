@@ -44,3 +44,10 @@ next-env.d.ts
 # Playwright
 playwright-report/
 test-results/
+
+# Raw evidence collection
+.sisyphus/evidence/pcbang/raw/
+.sisyphus/evidence/pcbang/parser/
+.sisyphus/evidence/pcbang/load-policy/
+.sisyphus/evidence/pcbang/venue-import/
+.sisyphus/evidence/pcbang/run/

@@ -8,7 +8,15 @@
     "start": "next start",
     "lint": "eslint .",
     "db:types": "bunx supabase gen types --lang=typescript --linked > src/types/database.ts",
-    "test:e2e": "bunx playwright test"
+    "test:e2e": "bunx playwright test",
+    "crawl:run": "bun run scripts/pcbang/run-crawl.ts",
+    "crawl:source-eval": "bun run scripts/pcbang/source-eval.ts",
+    "crawl:source-approve": "bun run scripts/pcbang/source-approve.ts",
+    "crawl:raw-collect": "bun run scripts/pcbang/raw-collect.ts",
+    "crawl:pica-followup": "bun run scripts/pcbang/raw-collect-pica-followup.ts",
+    "crawl:parse-raw": "bun run scripts/pcbang/run-parser.ts",
+    "crawl:classify-load-policy": "bun run scripts/pcbang/run-load-policy.ts",
+    "crawl:import-venues": "bun run scripts/pcbang/run-venue-import.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
