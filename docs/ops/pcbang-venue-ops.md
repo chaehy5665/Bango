@@ -7,7 +7,9 @@ This runbook documents the end-to-end venue data collection and import process f
 The `crawl:run` command orchestrates the full pipeline:
 
 1. **Raw Collection**: Capture HTTP responses from source APIs
-2. **Follow-up Collection** (Pica only): Fetch detail pages for each venue seed
+2. **Follow-up Collection**: Fetch detail pages for each venue
+   - **Pica**: Fetches detail pages for venues extracted from paginated list (default 20 pages, configurable)
+   - **GetO**: Fetches Seoul district list, generates list pages across multiple districts/pages (default: 5 districts × 2 pages/district, capped at 10 total), then fetches detail pages for all unique shop_seq values
 3. **Parsing**: Extract structured data from raw captures
 4. **Load-Policy Classification**: Determine insertability and dedupe against existing venues
 5. **Venue Import**: Insert new venues into the database (dry-run by default)
@@ -59,28 +61,40 @@ bun run crawl:run -- --source <geto|pica> [options]
 | `--existing-snapshot` | No | path | Path to existing venue snapshot JSON for deduplication |
 | `--limit` | No | integer | Limit venue count (Pica only) |
 | `--seoul-only` | No | (flag) | Filter to Seoul venues only (Pica only) |
+| `--pica-max-pages` | No | integer | Max list pages to fetch (Pica only, default: 20) |
+| `--geto-district-limit` | No | integer | Max districts to fetch (GetO only, default: 5) |
+| `--geto-max-pages-per-district` | No | integer | Max pages per district (GetO only, default: 2) |
+| `--geto-max-list-pages` | No | integer | Max total list pages (GetO only, default: 10) |
+| `--geto-max-details` | No | integer | Max detail pages to fetch (GetO only, no default limit) |
 
 ### Flag Validation
 
-- `--limit` and `--seoul-only` are **only valid for Pica** source. Using them with GetO will fail.
+- `--limit`, `--seoul-only`, and `--pica-max-pages` are **only valid for Pica** source. Using them with GetO will fail.
+- `--geto-district-limit`, `--geto-max-pages-per-district`, `--geto-max-list-pages`, and `--geto-max-details` are **only valid for GetO** source. Using them with Pica will fail.
 - `--apply` affects **only the final venue import stage**. All prior stages always run.
 
 ## Usage Examples
 
 ### GetO: Dry-Run
 
-Collect all GetO targets, parse, classify, and prepare for import (no database writes):
+Collect GetO targets across Seoul districts, parse, classify, and prepare for import (no database writes):
 
 ```bash
 bun run crawl:run -- --source geto
 ```
 
 **Expected output:**
-- Raw collection manifest in `.sisyphus/evidence/pcbang/raw/geto/<operation_id>-raw/`
-- Parsed canonical venues in `.sisyphus/evidence/pcbang/parser/geto/<operation_id>-raw/canonical.json`
-- Insertable venues in `.sisyphus/evidence/pcbang/load-policy/geto/<operation_id>-raw/insertable.json`
+- District fetch manifest in `.sisyphus/evidence/pcbang/raw/geto/<operation_id>-districts/`
+- Raw collection (list pages) manifest in `.sisyphus/evidence/pcbang/raw/geto/<operation_id>-raw/`
+- Raw collection (detail) manifest in `.sisyphus/evidence/pcbang/raw/geto/<operation_id>-detail/`
+- Parsed canonical venues in `.sisyphus/evidence/pcbang/parser/geto/<operation_id>-detail/canonical.json`
+- Insertable venues in `.sisyphus/evidence/pcbang/load-policy/geto/<operation_id>-detail/insertable.json`
 - Dry-run import report in `.sisyphus/evidence/pcbang/venue-import/geto/<operation_id>/`
 - Top-level summary in `.sisyphus/evidence/pcbang/run/geto/<operation_id>/summary.json`
+
+**Note:** GetO now performs three raw collection stages: (1) fetch Seoul district list, (2) fetch list pages across districts, (3) fetch detail pages for all extracted shop_seq values.
+
+**Default behavior:** Fetches 5 districts × 2 pages/district = 10 list pages (default cap), then extracts all unique shop_seq values and fetches their detail pages.
 
 ### GetO: Apply
 
@@ -101,25 +115,55 @@ bun run crawl:run -- --source geto --run-id prod-geto-2026-03-28
 ```
 
 Stage run IDs will be:
-- Raw: `prod-geto-2026-03-28-raw`
-- Parser: `prod-geto-2026-03-28-raw`
-- Load policy: `prod-geto-2026-03-28-raw`
+- District fetch: `prod-geto-2026-03-28-districts`
+- Raw (list pages): `prod-geto-2026-03-28-raw`
+- Raw (detail): `prod-geto-2026-03-28-detail`
+- Parser: `prod-geto-2026-03-28-detail`
+- Load policy: `prod-geto-2026-03-28-detail`
 - Venue import: `prod-geto-2026-03-28`
+
+### GetO: Custom District and Page Limits
+
+Control coverage breadth:
+
+```bash
+# Narrow: 2 districts × 1 page/district
+bun run crawl:run -- --source geto --geto-district-limit 2 --geto-max-pages-per-district 1
+
+# Broad: 10 districts × 3 pages/district, capped at 20 list pages
+bun run crawl:run -- --source geto --geto-district-limit 10 --geto-max-pages-per-district 3 --geto-max-list-pages 20
+
+# Limit detail fetches to first 50 unique venues
+bun run crawl:run -- --source geto --geto-max-details 50
+```
 
 ### Pica: Dry-Run with Seoul Filter and Limit
 
-Collect Pica list, follow up with detail pages for up to 10 Seoul venues, then parse/classify/dry-run import:
+Collect Pica paginated list (default 20 pages), follow up with detail pages for up to 10 Seoul venues, then parse/classify/dry-run import:
 
 ```bash
 bun run crawl:run -- --source pica --seoul-only --limit 10
 ```
 
 **Expected behavior:**
-1. Seed collection: Fetch main Pica venue list
-2. Detail collection: Extract seeds, filter to Seoul addresses, limit to 10, fetch detail+map pages (20 HTTP requests total)
-3. Parse the 20 detail captures
-4. Classify and prepare insertable venues
-5. Dry-run import (no DB writes)
+1. Seed collection: Fetch Pica venue list pages 1-20 (default, configurable)
+2. Extract and dedupe seeds by SEQ across all list pages
+3. Detail collection: Filter to Seoul addresses, limit to 10, fetch detail+map pages (20 HTTP requests total)
+4. Parse the 20 detail captures
+5. Classify and prepare insertable venues
+6. Dry-run import (no DB writes)
+
+### Pica: Custom Page Count
+
+Increase coverage by fetching more list pages:
+
+```bash
+# Fetch 50 list pages instead of default 20
+bun run crawl:run -- --source pica --pica-max-pages 50 --seoul-only
+
+# Narrow test: 3 pages only
+bun run crawl:run -- --source pica --pica-max-pages 3 --limit 5
+```
 
 ### Pica: Apply
 
@@ -157,7 +201,7 @@ All artifacts are written under `.sisyphus/evidence/pcbang/` by default. You can
 │       └── <operation_id>-detail/ # Pica follow-up (detail) collection
 ├── parser/                       # Stage 3: Parsed canonical data
 │   ├── geto/
-│   │   └── <operation_id>-raw/
+│   │   └── <operation_id>-detail/
 │   │       ├── canonical.json    # Valid canonical venues
 │   │       ├── diagnostics.json  # Parser warnings/errors
 │   │       └── parser-manifest.json
@@ -165,7 +209,7 @@ All artifacts are written under `.sisyphus/evidence/pcbang/` by default. You can
 │       └── <operation_id>-detail/
 ├── load-policy/                  # Stage 4: Classification
 │   ├── geto/
-│   │   └── <operation_id>-raw/
+│   │   └── <operation_id>-detail/
 │   │       ├── insertable.json   # Ready to insert
 │   │       ├── review-needed.json # Manual review required
 │   │       ├── skipped.json      # Filtered out
@@ -253,10 +297,19 @@ If a stage fails mid-operation, the orchestrator **does not resume**. You must:
 ### Pica Two-Stage Collection
 
 Pica requires two raw collection stages:
-1. **Seed**: Fetch the main list to extract venue IDs
-2. **Detail**: Fetch detail+map pages for each venue
+1. **Seed**: Fetch paginated list pages (default 20 pages, configurable via `--pica-max-pages`) to extract venue IDs
+2. **Detail**: Dedupe seeds by SEQ, then fetch detail+map pages for each unique venue
 
 The orchestrator handles this automatically. If you need to re-run only the detail stage, use the standalone `crawl:pica-followup` command.
+
+### GetO Three-Stage Collection
+
+GetO now performs three raw collection stages:
+1. **District fetch**: Fetch Seoul district list from the public API
+2. **List pages**: Generate and fetch list page targets across Seoul districts (default: 5 districts × 2 pages/district, capped at 10 total, configurable)
+3. **Detail**: Extract unique shop_seq values from all list HTMLs, then fetch each detail page
+
+The orchestrator handles this automatically. Default behavior fetches significantly more venues than the previous single-district approach.
 
 ### Deduplication
 
