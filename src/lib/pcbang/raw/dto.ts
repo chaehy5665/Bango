@@ -86,4 +86,11 @@ export interface CollectorConfig {
   output_dir: string
   run_id: string
   timeout_ms: number
+  pica_max_pages?: number
+  geto_districts?: string[]
+  geto_seed_options?: {
+    district_limit?: number
+    max_pages_per_district?: number
+    max_list_pages?: number
+  }
 }

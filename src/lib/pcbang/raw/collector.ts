@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import type { CaptureArtifactManifest, CaptureTargetSpec, CollectorConfig, SourceId } from '@/lib/pcbang/raw/dto'
 import { ArtifactStore } from '@/lib/pcbang/raw/artifact-store'
 import { getSourcePreset, getTargetsByIds, guardPresetSafety } from '@/lib/pcbang/raw/source-presets'
+import { buildGetoSeedTargets } from '@/lib/pcbang/raw/geto-seed'
 
 export interface CollectorResult {
   run_id: string
@@ -37,9 +38,22 @@ export class RawCollector {
       const custom_preset = { source_id: config.source, targets: config.custom_targets }
       guardPresetSafety(custom_preset)
     } else {
-      const preset = getSourcePreset(config.source)
+      const preset_config =
+        config.source === 'pica' && config.pica_max_pages !== undefined
+          ? { pica_max_pages: config.pica_max_pages }
+          : config.source === 'geto' && config.geto_districts !== undefined
+            ? { geto_districts: config.geto_districts }
+            : undefined
+
+      const preset = getSourcePreset(config.source, preset_config)
       guardPresetSafety(preset)
-      targets = config.targets ? getTargetsByIds(config.source, config.targets) : preset.targets
+
+      if (config.source === 'geto' && config.geto_districts && config.geto_districts.length > 0) {
+        const seed_targets = buildGetoSeedTargets(config.geto_districts, config.geto_seed_options)
+        targets = config.targets ? getTargetsByIds(config.source, config.targets) : [...preset.targets, ...seed_targets]
+      } else {
+        targets = config.targets ? getTargetsByIds(config.source, config.targets) : preset.targets
+      }
     }
 
     const started_at = new Date().toISOString()

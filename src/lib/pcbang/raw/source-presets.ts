@@ -1,4 +1,8 @@
 import type { CaptureTargetSpec, SourceId, SourcePreset } from '@/lib/pcbang/raw/dto'
+import { buildPicaSeedTargets } from '@/lib/pcbang/raw/pica-seed'
+import { buildSeoulDistrictListTarget, buildGetoSeedTargets } from '@/lib/pcbang/raw/geto-seed'
+
+export { buildSeoulDistrictListTarget } from '@/lib/pcbang/raw/geto-seed'
 
 export const GETO_TARGETS: Record<string, CaptureTargetSpec> = {
   landing_html: {
@@ -31,21 +35,6 @@ export const GETO_TARGETS: Record<string, CaptureTargetSpec> = {
     is_mutating: false,
     description: 'GetO sample public detail page discovered from the Seoul/Gangnam list',
   },
-  district_list_json: {
-    target_id: 'district_list_json',
-    method: 'POST',
-    url: 'https://www.playgeto.com/landing/pcbang_json.php',
-    request_body: 'areaName1=%EC%84%9C%EC%9A%B8',
-    request_headers: {
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'X-Requested-With': 'XMLHttpRequest',
-    },
-    anonymous_safe: true,
-    requires_auth: false,
-    requires_captcha: false,
-    is_mutating: false,
-    description: 'GetO public district-list JSON endpoint for the selected first-level region',
-  },
 }
 
 export const PICA_TARGETS: Record<string, CaptureTargetSpec> = {
@@ -69,21 +58,6 @@ export const PICA_TARGETS: Record<string, CaptureTargetSpec> = {
     is_mutating: false,
     description: 'Pica public franchise PC방 list page',
   },
-  main_pcbang_list_json: {
-    target_id: 'main_pcbang_list_json',
-    method: 'POST',
-    url: 'https://www.picaplay.com/pcbang/mainPcbangList.do',
-    request_body: 'currentPageNo=1',
-    request_headers: {
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'X-Requested-With': 'XMLHttpRequest',
-    },
-    anonymous_safe: true,
-    requires_auth: false,
-    requires_captcha: false,
-    is_mutating: false,
-    description: 'Pica public POST JSON endpoint for PC방 listings',
-  },
   notice_list_html: {
     target_id: 'notice_list_html',
     method: 'GET',
@@ -96,18 +70,48 @@ export const PICA_TARGETS: Record<string, CaptureTargetSpec> = {
   },
 }
 
+function buildPicaTargetsWithPagination(max_pages?: number): CaptureTargetSpec[] {
+  const auxiliary = Object.values(PICA_TARGETS)
+  const seed_targets = buildPicaSeedTargets(max_pages)
+  return [...auxiliary, ...seed_targets]
+}
+
+function buildGetoTargetsWithSeeds(districts?: string[]): CaptureTargetSpec[] {
+  const auxiliary = Object.values(GETO_TARGETS)
+  const district_target = buildSeoulDistrictListTarget()
+  
+  if (!districts || districts.length === 0) {
+    return [...auxiliary, district_target]
+  }
+  
+  const seed_targets = buildGetoSeedTargets(districts)
+  return [...auxiliary, district_target, ...seed_targets]
+}
+
 export const SOURCE_PRESETS: Record<SourceId, SourcePreset> = {
   geto: {
     source_id: 'geto',
-    targets: Object.values(GETO_TARGETS),
+    targets: buildGetoTargetsWithSeeds(),
   },
   pica: {
     source_id: 'pica',
-    targets: Object.values(PICA_TARGETS),
+    targets: buildPicaTargetsWithPagination(),
   },
 }
 
-export function getSourcePreset(sourceId: SourceId): SourcePreset {
+export function getSourcePreset(sourceId: SourceId, config?: { pica_max_pages?: number; geto_districts?: string[] }): SourcePreset {
+  if (sourceId === 'pica' && config?.pica_max_pages !== undefined) {
+    return {
+      source_id: 'pica',
+      targets: buildPicaTargetsWithPagination(config.pica_max_pages),
+    }
+  }
+  if (sourceId === 'geto' && config?.geto_districts !== undefined) {
+    return {
+      source_id: 'geto',
+      targets: buildGetoTargetsWithSeeds(config.geto_districts),
+    }
+  }
   return SOURCE_PRESETS[sourceId]
 }
 
