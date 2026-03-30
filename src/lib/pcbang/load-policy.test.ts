@@ -156,4 +156,24 @@ describe('load policy', () => {
     assert.equal(result.errors.length, 0)
     assert.equal(result.insertable.venues[0].venue.name, '가격 없음 PC방')
   })
+
+  test('skips duplicate incoming venues with the same dedupe key', () => {
+    const duplicateVenue = {
+      venue: {
+        name: '중복 PC방',
+        address_full: '서울 강북구 도봉로 101',
+        address_district: '강북구',
+        lat: 37.6394,
+        lng: 127.0257,
+      },
+      pricing_tiers: [],
+    }
+
+    const result = classifyLoadPolicy([duplicateVenue, duplicateVenue], [])
+
+    assert.equal(result.insertable.venues.length, 1)
+    assert.equal(result.skipped.length, 1)
+    assert.equal(result.skipped[0].reason, 'duplicate_incoming_venue')
+    assert.equal(result.errors.length, 0)
+  })
 })

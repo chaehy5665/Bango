@@ -71,6 +71,33 @@ test('classifyLoadPolicy allows venue-only inserts when pricing tiers are missin
   }
 })
 
+test('classifyLoadPolicy skips duplicate incoming venues in one batch', () => {
+  const duplicateVenue: CanonicalVenueWithPricing = {
+    venue: {
+      name: '중복 venue',
+      address_full: '서울 강북구 도봉로 101',
+      address_district: '강북구',
+      lat: 37.6394,
+      lng: 127.0257,
+    },
+    pricing_tiers: [],
+  }
+
+  const result = classifyLoadPolicy([duplicateVenue, duplicateVenue], [])
+
+  if (result.insertable.venues.length !== 1) {
+    throw new Error(`Expected 1 insertable venue, got ${result.insertable.venues.length}`)
+  }
+
+  if (result.skipped.length !== 1 || result.skipped[0].reason !== 'duplicate_incoming_venue') {
+    throw new Error(`Expected one duplicate_incoming_venue skip, got ${JSON.stringify(result.skipped)}`)
+  }
+
+  if (result.errors.length !== 0) {
+    throw new Error(`Expected no errors, got ${result.errors.length}`)
+  }
+})
+
 test('classifyLoadPolicy flags existing venues for review', () => {
   const incoming: CanonicalVenueWithPricing[] = [
     {

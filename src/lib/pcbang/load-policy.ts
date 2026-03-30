@@ -77,6 +77,7 @@ export function classifyLoadPolicy(
   const reviewNeeded: ReviewNeededEntry[] = []
   const skipped: SkippedEntry[] = []
   const errors: ErrorEntry[] = []
+  const seenIncomingVenueKeys = new Set<string>()
 
   for (const record of incoming) {
     const venueResult = validateVenueContract(record.venue)
@@ -94,6 +95,17 @@ export function classifyLoadPolicy(
       venueResult.value.address_full,
       venueResult.value.address_district
     )
+
+    if (seenIncomingVenueKeys.has(dedupeKey)) {
+      skipped.push({
+        reason: 'duplicate_incoming_venue',
+        venue_name: venueResult.value.name,
+        errors: ['duplicate dedupe key within current crawl batch'],
+      })
+      continue
+    }
+    seenIncomingVenueKeys.add(dedupeKey)
+
     const matchedVenue = existingByKey.get(dedupeKey)
 
     if (matchedVenue) {
