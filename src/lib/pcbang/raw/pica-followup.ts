@@ -28,39 +28,46 @@ export async function extractPicaSeeds(
   const manifest_content = await readFile(manifest_path, 'utf-8')
   const manifest = JSON.parse(manifest_content) as RunManifest
 
-  const list_capture = manifest.captures.find((c) => c.target_id === 'main_pcbang_list_json')
-  if (!list_capture) {
-    throw new Error(`No main_pcbang_list_json capture found in run ${from_run_id}`)
-  }
-
-  const capture_dir = join(
-    raw_base_dir,
-    'pica',
-    from_run_id,
-    'captures',
-    `${list_capture.ordinal}-${list_capture.target_id}`
+  const list_captures = manifest.captures.filter(
+    (c) => c.target_id === 'main_pcbang_list_json' || c.target_id.startsWith('main_pcbang_list_page_')
   )
-  const body_path = join(capture_dir, list_capture.body_filename)
-  const body_content = await readFile(body_path, 'utf-8')
-  const body = JSON.parse(body_content) as { pcbangList?: Array<Record<string, unknown>> }
 
-  if (!Array.isArray(body.pcbangList)) {
-    throw new Error('pcbangList is not an array in the source run')
+  if (list_captures.length === 0) {
+    throw new Error(`No list captures found in run ${from_run_id}`)
   }
 
-  const seeds: PicaVenueSeed[] = []
-  for (const record of body.pcbangList) {
-    if (typeof record.SEQ === 'number' && typeof record.PCBANGID === 'string') {
-      seeds.push({
-        seq: record.SEQ,
-        pcbang_id: record.PCBANGID,
-        name: typeof record.PCBANGNAME === 'string' ? record.PCBANGNAME : '',
-        address: typeof record.ADDRESS === 'string' ? record.ADDRESS : '',
-      })
+  const seed_map = new Map<number, PicaVenueSeed>()
+
+  for (const list_capture of list_captures) {
+    const capture_dir = join(
+      raw_base_dir,
+      'pica',
+      from_run_id,
+      'captures',
+      `${list_capture.ordinal}-${list_capture.target_id}`
+    )
+    const body_path = join(capture_dir, list_capture.body_filename)
+    const body_content = await readFile(body_path, 'utf-8')
+    const body = JSON.parse(body_content) as { pcbangList?: Array<Record<string, unknown>> }
+
+    if (!Array.isArray(body.pcbangList)) {
+      continue
+    }
+
+    for (const record of body.pcbangList) {
+      if (typeof record.SEQ === 'number' && typeof record.PCBANGID === 'string') {
+        const seed: PicaVenueSeed = {
+          seq: record.SEQ,
+          pcbang_id: record.PCBANGID,
+          name: typeof record.PCBANGNAME === 'string' ? record.PCBANGNAME : '',
+          address: typeof record.ADDRESS === 'string' ? record.ADDRESS : '',
+        }
+        seed_map.set(seed.seq, seed)
+      }
     }
   }
 
-  return seeds
+  return Array.from(seed_map.values())
 }
 
 export function filterSeoulSeeds(seeds: PicaVenueSeed[]): PicaVenueSeed[] {

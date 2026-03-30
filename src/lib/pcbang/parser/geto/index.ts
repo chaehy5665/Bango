@@ -14,7 +14,10 @@ export function parseGetoBundles(bundles: CaptureBundle[]): ParserResult[] {
         candidates,
         diagnostics,
       })
-    } else if (bundle.target_id === 'sample_detail_html') {
+    } else if (
+      bundle.target_id === 'sample_detail_html' ||
+      bundle.target_id.startsWith('detail_shop_seq_')
+    ) {
       const { candidates, diagnostics } = parseGetoDetailHtml(bundle)
       results.push({
         target_id: bundle.target_id,

@@ -32,7 +32,10 @@ export function parsePicaBundles(bundles: CaptureBundle[]): ParserResult[] {
   const detailResults: ParserResult[] = []
 
   for (const bundle of bundles) {
-    if (bundle.target_id === 'main_pcbang_list_json') {
+    if (
+      bundle.target_id === 'main_pcbang_list_json' ||
+      bundle.target_id.startsWith('main_pcbang_list_page_')
+    ) {
       const { candidates, diagnostics } = parsePicaListJson(bundle)
       results.push({
         target_id: bundle.target_id,
