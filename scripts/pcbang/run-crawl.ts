@@ -9,24 +9,39 @@ Usage: bun run crawl:run -- --source <geto|pica> [options]
 Required flags:
   --source            Source identifier (geto or pica)
 
-Optional flags:
+Optional flags (both sources):
   --run-id            Override generated operation ID
   --apply             Apply inserts to live database (default: dry-run only)
   --output-root       Output evidence root directory (default: .sisyphus/evidence/pcbang)
   --timeout-ms        HTTP request timeout in milliseconds (default: 30000)
   --existing-snapshot Path to existing venue snapshot JSON for load-policy classification
-  --limit             Limit number of venues (pica only)
-  --seoul-only        Filter to only Seoul venues (pica only)
+
+Optional flags (pica only):
+  --limit             Limit number of venues
+  --seoul-only        Filter to only Seoul venues
+  --pica-max-pages    Maximum list pages to fetch (default: 20)
+
+Optional flags (geto only):
+  --geto-district-limit          Maximum districts to fetch (default: 5)
+  --geto-max-pages-per-district  Maximum pages per district (default: 2)
+  --geto-max-list-pages          Maximum total list pages (default: 10)
+  --geto-max-details             Maximum detail pages to fetch (no default limit)
 
 Examples:
-  # GetO dry-run (default)
+  # GetO dry-run with broader Seoul coverage (default)
   bun run crawl:run -- --source geto
+
+  # GetO with custom district/page limits
+  bun run crawl:run -- --source geto --geto-district-limit 3 --geto-max-pages-per-district 1
 
   # GetO with apply and custom run ID
   bun run crawl:run -- --source geto --run-id prod-geto-2026-03-28 --apply
 
   # Pica dry-run with Seoul filter and limit
   bun run crawl:run -- --source pica --seoul-only --limit 10
+
+  # Pica with higher page count
+  bun run crawl:run -- --source pica --pica-max-pages 50 --seoul-only
 
   # Pica with existing snapshot and apply
   bun run crawl:run -- --source pica --existing-snapshot snapshot.json --apply
@@ -41,6 +56,11 @@ interface CliArgs {
   existing_snapshot_path?: string
   limit?: number
   seoul_only?: boolean
+  pica_max_pages?: number
+  geto_district_limit?: number
+  geto_max_pages_per_district?: number
+  geto_max_list_pages?: number
+  geto_max_details?: number
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -120,6 +140,56 @@ function parseArgs(argv: string[]): CliArgs {
       continue
     }
 
+    if (token === '--pica-max-pages') {
+      const pages = Number.parseInt(value, 10)
+      if (!Number.isInteger(pages) || pages <= 0) {
+        throw new Error('--pica-max-pages must be a positive integer')
+      }
+      parsed.pica_max_pages = pages
+      i++
+      continue
+    }
+
+    if (token === '--geto-district-limit') {
+      const limit = Number.parseInt(value, 10)
+      if (!Number.isInteger(limit) || limit <= 0) {
+        throw new Error('--geto-district-limit must be a positive integer')
+      }
+      parsed.geto_district_limit = limit
+      i++
+      continue
+    }
+
+    if (token === '--geto-max-pages-per-district') {
+      const pages = Number.parseInt(value, 10)
+      if (!Number.isInteger(pages) || pages <= 0) {
+        throw new Error('--geto-max-pages-per-district must be a positive integer')
+      }
+      parsed.geto_max_pages_per_district = pages
+      i++
+      continue
+    }
+
+    if (token === '--geto-max-list-pages') {
+      const pages = Number.parseInt(value, 10)
+      if (!Number.isInteger(pages) || pages <= 0) {
+        throw new Error('--geto-max-list-pages must be a positive integer')
+      }
+      parsed.geto_max_list_pages = pages
+      i++
+      continue
+    }
+
+    if (token === '--geto-max-details') {
+      const details = Number.parseInt(value, 10)
+      if (!Number.isInteger(details) || details <= 0) {
+        throw new Error('--geto-max-details must be a positive integer')
+      }
+      parsed.geto_max_details = details
+      i++
+      continue
+    }
+
     throw new Error(`unknown flag: ${token}`)
   }
 
@@ -161,6 +231,23 @@ async function main() {
     if (parsed.seoul_only) {
       console.log(`  Seoul only: yes`)
     }
+    if (parsed.pica_max_pages) {
+      console.log(`  Pica max pages: ${parsed.pica_max_pages}`)
+    }
+  }
+  if (parsed.source === 'geto') {
+    if (parsed.geto_district_limit) {
+      console.log(`  GetO district limit: ${parsed.geto_district_limit}`)
+    }
+    if (parsed.geto_max_pages_per_district) {
+      console.log(`  GetO max pages per district: ${parsed.geto_max_pages_per_district}`)
+    }
+    if (parsed.geto_max_list_pages) {
+      console.log(`  GetO max list pages: ${parsed.geto_max_list_pages}`)
+    }
+    if (parsed.geto_max_details) {
+      console.log(`  GetO max details: ${parsed.geto_max_details}`)
+    }
   }
   console.log()
 
@@ -173,6 +260,11 @@ async function main() {
     limit: parsed.limit,
     seoul_only: parsed.seoul_only,
     apply: parsed.apply,
+    pica_max_pages: parsed.pica_max_pages,
+    geto_district_limit: parsed.geto_district_limit,
+    geto_max_pages_per_district: parsed.geto_max_pages_per_district,
+    geto_max_list_pages: parsed.geto_max_list_pages,
+    geto_max_details: parsed.geto_max_details,
   })
 
   console.log('✓ Crawl orchestration completed')

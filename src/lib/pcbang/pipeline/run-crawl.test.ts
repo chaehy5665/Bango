@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'bun:test'
@@ -32,6 +32,8 @@ test('runCrawlWithDeps rejects pica-only flags for geto', async () => {
         {
           runCollector: async () => createCollectorResult('geto', 'noop'),
           runPicaFollowup: async () => createCollectorResult('pica', 'noop'),
+          runGetoFollowup: async () => createCollectorResult('geto', 'noop'),
+          fetchSeoulDistricts: async () => ({ districts: ['강남구'] }),
           runParserPipeline: async () => ({
             output_dir: '/tmp',
             manifest_path: '/tmp/parser-manifest.json',
@@ -68,7 +70,7 @@ test('runCrawlWithDeps rejects pica-only flags for geto', async () => {
       )
     },
     {
-      message: '--limit and --seoul-only are only valid for source=pica',
+      message: '--limit, --seoul-only, and --pica-max-pages are only valid for source=pica',
     }
   )
 })
@@ -87,12 +89,64 @@ test('runCrawlWithDeps orchestrates geto dry-run and writes op summary', async (
       {
         runCollector: async (config) => {
           calls.push(`collector:${config.source}:${config.run_id}`)
+          
+          if (config.run_id === 'verify-geto-ops-districts') {
+            const districtDir = join(tmpDir, 'raw', 'geto', config.run_id)
+            const districtCaptureDir = join(districtDir, 'captures', '1-district_list_json')
+            await mkdir(districtCaptureDir, { recursive: true })
+            
+            const districtManifest = {
+              schema_version: 1,
+              run_id: config.run_id,
+              source_id: 'geto',
+              started_at: '2026-03-28T00:00:00.000Z',
+              completed_at: '2026-03-28T00:00:01.000Z',
+              status: 'success',
+              target_ids: ['district_list_json'],
+              success_count: 1,
+              failure_count: 0,
+              captures: [
+                {
+                  schema_version: 1,
+                  target_id: 'district_list_json',
+                  ordinal: 1,
+                  captured_at: '2026-03-28T00:00:00.000Z',
+                  status_code: 200,
+                  body_size_bytes: 0,
+                  body_sha256: 'district-sha',
+                  body_filename: 'body.json',
+                  metadata_filename: 'metadata.json',
+                  request_body_filename: null,
+                },
+              ],
+              errors: [],
+            }
+            
+            const districtBody = {
+              result: [
+                { AREANAME2: '강남구' },
+                { AREANAME2: '강서구' },
+              ],
+            }
+            
+            await writeFile(
+              join(districtDir, 'run-manifest.json'),
+              JSON.stringify(districtManifest, null, 2) + '\n',
+              'utf-8'
+            )
+            await writeFile(
+              join(districtCaptureDir, 'body.json'),
+              JSON.stringify(districtBody),
+              'utf-8'
+            )
+          }
+          
           return {
             source_id: config.source,
             run_id: config.run_id,
             started_at: '2026-03-28T00:00:00.000Z',
             completed_at: '2026-03-28T00:00:01.000Z',
-            success_count: 4,
+            success_count: config.run_id === 'verify-geto-ops-districts' ? 1 : 4,
             failure_count: 0,
             had_errors: false,
             manifest_path: join(tmpDir, 'raw', 'geto', config.run_id, 'run-manifest.json'),
@@ -101,6 +155,20 @@ test('runCrawlWithDeps orchestrates geto dry-run and writes op summary', async (
         runPicaFollowup: async () => {
           throw new Error('pica followup should not run for geto')
         },
+        runGetoFollowup: async (config) => {
+          calls.push(`geto-followup:${config.from_run_id}:${config.run_id}`)
+          return {
+            source_id: 'geto',
+            run_id: config.run_id!,
+            started_at: '2026-03-28T00:00:01.000Z',
+            completed_at: '2026-03-28T00:00:02.000Z',
+            success_count: 2,
+            failure_count: 0,
+            had_errors: false,
+            manifest_path: join(tmpDir, 'raw', 'geto', config.run_id!, 'run-manifest.json'),
+          }
+        },
+        fetchSeoulDistricts: async () => ({ districts: ['강남구', '강서구', '마포구'] }),
         runParserPipeline: async (config) => {
           calls.push(`parser:${config.source_id}:${config.raw_run_id}`)
           return {
@@ -147,13 +215,15 @@ test('runCrawlWithDeps orchestrates geto dry-run and writes op summary', async (
 
     assert.deepEqual(calls, [
       'collector:geto:verify-geto-ops-raw',
-      'parser:geto:verify-geto-ops-raw',
-      'load-policy:geto:verify-geto-ops-raw',
+      'geto-followup:verify-geto-ops-raw:verify-geto-ops-detail',
+      'parser:geto:verify-geto-ops-detail',
+      'load-policy:geto:verify-geto-ops-detail',
       'venue-import:dry-run',
     ])
     assert.equal(summary.stage_run_ids.raw_primary, 'verify-geto-ops-raw')
+    assert.equal(summary.stage_run_ids.raw_detail, 'verify-geto-ops-detail')
     assert.equal(summary.apply_ran, false)
-    assert.equal(summary.counts.raw_success, 4)
+    assert.equal(summary.counts.raw_success, 6)
 
     const persisted = JSON.parse(
       await readFile(join(tmpDir, 'run', 'geto', 'verify-geto-ops', 'summary.json'), 'utf-8')
@@ -161,7 +231,7 @@ test('runCrawlWithDeps orchestrates geto dry-run and writes op summary', async (
     assert.equal(persisted.operation_id, 'verify-geto-ops')
     assert.equal(
       persisted.artifact_paths.insertable,
-      join(tmpDir, 'load-policy', 'geto', 'verify-geto-ops-raw', 'insertable.json')
+      join(tmpDir, 'load-policy', 'geto', 'verify-geto-ops-detail', 'insertable.json')
     )
   } finally {
     await rm(tmpDir, { recursive: true, force: true })
@@ -209,6 +279,10 @@ test('runCrawlWithDeps orchestrates pica follow-up flow and apply propagation', 
             manifest_path: join(tmpDir, 'raw', 'pica', config.run_id!, 'run-manifest.json'),
           }
         },
+        runGetoFollowup: async () => {
+          throw new Error('geto followup should not run for pica')
+        },
+        fetchSeoulDistricts: async () => ({ districts: ['강남구'] }),
         runParserPipeline: async (config) => {
           calls.push(`parser:${config.source_id}:${config.raw_run_id}`)
           return {

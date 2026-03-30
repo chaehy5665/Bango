@@ -3,6 +3,8 @@ import { join } from 'node:path'
 import type { SourceId } from '@/lib/pcbang/raw/dto'
 import { runCollector, type CollectorResult } from '@/lib/pcbang/raw/collector'
 import { runPicaFollowup } from '@/lib/pcbang/raw/pica-followup'
+import { runGetoFollowup } from '@/lib/pcbang/raw/geto-followup'
+import { buildSeoulDistrictListTarget, buildGetoSeedTargets, fetchSeoulDistricts } from '@/lib/pcbang/raw/geto-seed'
 import { runParserPipeline } from '@/lib/pcbang/pipeline/run-parser'
 import { runLoadPolicyClassifier } from '@/lib/pcbang/pipeline/run-load-policy'
 import { runVenueImport } from '@/lib/pcbang/pipeline/run-venue-import'
@@ -10,6 +12,8 @@ import { runVenueImport } from '@/lib/pcbang/pipeline/run-venue-import'
 interface RunCrawlDeps {
   runCollector: typeof runCollector
   runPicaFollowup: typeof runPicaFollowup
+  runGetoFollowup: typeof runGetoFollowup
+  fetchSeoulDistricts: typeof fetchSeoulDistricts
   runParserPipeline: typeof runParserPipeline
   runLoadPolicyClassifier: typeof runLoadPolicyClassifier
   runVenueImport: typeof runVenueImport
@@ -18,6 +22,8 @@ interface RunCrawlDeps {
 const DEFAULT_DEPS: RunCrawlDeps = {
   runCollector,
   runPicaFollowup,
+  runGetoFollowup,
+  fetchSeoulDistricts,
   runParserPipeline,
   runLoadPolicyClassifier,
   runVenueImport,
@@ -32,6 +38,11 @@ export interface CrawlRunOptions {
   limit?: number
   seoul_only?: boolean
   apply?: boolean
+  pica_max_pages?: number
+  geto_district_limit?: number
+  geto_max_pages_per_district?: number
+  geto_max_list_pages?: number
+  geto_max_details?: number
 }
 
 export interface CrawlRunSummary {
@@ -100,8 +111,19 @@ export async function runCrawlWithDeps(
   const started_at = new Date().toISOString()
 
   if (options.source === 'geto') {
-    if (options.limit !== undefined || options.seoul_only !== undefined) {
-      throw new Error('--limit and --seoul-only are only valid for source=pica')
+    if (options.limit !== undefined || options.seoul_only !== undefined || options.pica_max_pages !== undefined) {
+      throw new Error('--limit, --seoul-only, and --pica-max-pages are only valid for source=pica')
+    }
+  } else if (options.source === 'pica') {
+    if (
+      options.geto_district_limit !== undefined ||
+      options.geto_max_pages_per_district !== undefined ||
+      options.geto_max_list_pages !== undefined ||
+      options.geto_max_details !== undefined
+    ) {
+      throw new Error(
+        '--geto-district-limit, --geto-max-pages-per-district, --geto-max-list-pages, and --geto-max-details are only valid for source=geto'
+      )
     }
   }
 
@@ -117,17 +139,39 @@ export async function runCrawlWithDeps(
   let parser_run_id: string
 
   if (options.source === 'geto') {
+    const seoul_districts = await deps.fetchSeoulDistricts(timeout_ms)
+    const geto_primary_targets = [
+      buildSeoulDistrictListTarget(),
+      ...buildGetoSeedTargets(seoul_districts.districts, {
+        district_limit: options.geto_district_limit,
+        max_pages_per_district: options.geto_max_pages_per_district,
+        max_list_pages: options.geto_max_list_pages,
+      }),
+    ]
+
     const geto_raw_run_id = buildStageRunId(operation_id, 'raw')
-    raw_result = await deps.runCollector({
+    const geto_raw_result = await deps.runCollector({
       source: 'geto',
       targets: null,
+      custom_targets: geto_primary_targets,
       output_dir: raw_base_dir,
       run_id: geto_raw_run_id,
       timeout_ms,
     })
-    raw_success_count = raw_result.success_count
-    raw_failure_count = raw_result.failure_count
-    parser_run_id = geto_raw_run_id
+
+    const geto_detail_run_id = buildStageRunId(operation_id, 'detail')
+    const geto_detail_result = await deps.runGetoFollowup({
+      from_run_id: geto_raw_run_id,
+      raw_base_dir,
+      run_id: geto_detail_run_id,
+      timeout_ms,
+      max_details: options.geto_max_details,
+    })
+
+    raw_success_count = geto_raw_result.success_count + geto_detail_result.success_count
+    raw_failure_count = geto_raw_result.failure_count + geto_detail_result.failure_count
+    raw_result = geto_detail_result
+    parser_run_id = geto_detail_run_id
   } else {
     const pica_seed_run_id = buildStageRunId(operation_id, 'seed')
     const pica_seed_result = await deps.runCollector({
@@ -136,6 +180,7 @@ export async function runCrawlWithDeps(
       output_dir: raw_base_dir,
       run_id: pica_seed_run_id,
       timeout_ms,
+      pica_max_pages: options.pica_max_pages,
     })
 
     const pica_detail_run_id = buildStageRunId(operation_id, 'detail')
@@ -195,6 +240,7 @@ export async function runCrawlWithDeps(
       options.source === 'geto'
         ? {
             raw_primary: buildStageRunId(operation_id, 'raw'),
+            raw_detail: buildStageRunId(operation_id, 'detail'),
             parser: parser_run_id,
             load_policy: parser_run_id,
             venue_import: operation_id,
@@ -209,7 +255,13 @@ export async function runCrawlWithDeps(
     artifact_paths:
       options.source === 'geto'
         ? {
-            raw_manifest_primary: raw_result.manifest_path,
+            raw_manifest_primary: join(
+              raw_base_dir,
+              'geto',
+              buildStageRunId(operation_id, 'raw'),
+              'run-manifest.json'
+            ),
+            raw_manifest_detail: raw_result.manifest_path,
             parser_manifest: parser_result.manifest_path,
             canonical: parser_result.canonical_path,
             diagnostics: parser_result.diagnostics_path,
