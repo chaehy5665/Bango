@@ -24,22 +24,34 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 This project includes a venue data collection and import pipeline for PC Bang (internet cafe) venues in South Korea.
 
+### Default Operational Path
+
+Lite Mode is the default practical ingestion path:
+
+`raw collect -> parse -> canonical.json -> lite loader -> venues`
+
 ### Quick Start
 
-Run the full pipeline (dry-run):
+Run the default Lite pipeline (dry-run):
 
 ```bash
-# GetO source
-bun run crawl:run -- --source geto
+# Pica source
+bun run crawl:lite-run -- --source pica --seoul-only --limit 10
 
-# Pica source (with limit for testing)
-bun run crawl:run -- --source pica --seoul-only --limit 10
+# GetO source
+bun run crawl:lite-run -- --source geto --geto-max-details 20
 ```
 
-For production imports (writes to database), add `--apply`:
+Run a deterministic fixture-based dry-run without a live venue lookup:
 
 ```bash
-bun run crawl:run -- --source geto --apply
+bun run crawl:lite-load -- --input tests/fixtures/pcbang/lite-canonical.json --existing-snapshot tests/fixtures/pcbang/lite-existing-snapshot.json
+```
+
+For production inserts/updates, add `--apply`:
+
+```bash
+bun run crawl:lite-run -- --source pica --seoul-only --limit 10 --apply
 ```
 
 ### Documentation
@@ -47,21 +59,24 @@ bun run crawl:run -- --source geto --apply
 See the full operations runbook: [docs/ops/pcbang-venue-ops.md](docs/ops/pcbang-venue-ops.md)
 
 Topics covered:
-- Prerequisites and environment setup
-- Command reference and flags
-- Usage examples for GetO and Pica sources
+- Lite Mode default workflow and flags
+- Advanced/manual legacy load-policy workflow
 - Artifact layout and output structure
 - Troubleshooting common issues
 
 ### Individual Stage Commands
 
-The orchestrator wraps five stages. You can also run them individually:
+The Lite path still reuses the existing stage commands:
 
 - `bun run crawl:raw-collect` — Stage 1: Raw HTTP collection
 - `bun run crawl:pica-followup` — Stage 2: Pica follow-up detail collection
 - `bun run crawl:parse-raw` — Stage 3: Parse raw captures to canonical format
-- `bun run crawl:classify-load-policy` — Stage 4: Classify venues for insertability
-- `bun run crawl:import-venues` — Stage 5: Import venues to database
+- `bun run crawl:lite-load` — Stage 4 (default): Load `canonical.json` into `venues`
+
+Advanced/manual legacy commands still exist, but are no longer the default workflow:
+
+- `bun run crawl:classify-load-policy` — Legacy manual classification stage
+- `bun run crawl:import-venues` — Legacy manual import stage
 
 ## Learn More
 

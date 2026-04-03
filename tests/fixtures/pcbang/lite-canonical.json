@@ -1,0 +1,39 @@
+[
+  {
+    "source": "pica",
+    "source_id": "pica:fixture-insert",
+    "name": "라이트 테스트 신규",
+    "location_text": "서울 강남구 테헤란로 1",
+    "address_full": "서울 강남구 테헤란로 1",
+    "address_district": "강남구",
+    "lat": 37.498,
+    "lng": 127.027,
+    "source_ids": ["pica"],
+    "raw_metadata": {
+      "fixture": true
+    }
+  },
+  {
+    "source": "geto",
+    "source_id": "geto:fixture-update",
+    "name": "라이트 테스트 기존",
+    "location_text": "서울 서초구 서초대로 2",
+    "address_full": "서울 서초구 서초대로 2",
+    "address_district": "서초구",
+    "lat": 37.491,
+    "lng": 127.01,
+    "source_ids": ["geto"],
+    "raw_metadata": {
+      "fixture": true
+    }
+  },
+  {
+    "source": "pica",
+    "source_id": "pica:fixture-invalid",
+    "name": "라이트 테스트 오류",
+    "address_full": "",
+    "address_district": "송파구",
+    "lat": 37.51,
+    "lng": 127.11
+  }
+]

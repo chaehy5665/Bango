@@ -1,3 +1,5 @@
+import type { SourceId } from '@/lib/pcbang/raw/dto'
+
 export interface PcbangSampleVenue {
   sample_id: string
   name: string
@@ -25,11 +27,17 @@ export interface SourceRubric {
 }
 
 export interface CanonicalVenueRecord {
+  source?: SourceId
+  source_id?: string
   name: string
+  location_text?: string
   address_full: string
   address_district: string
   lat: number
   lng: number
+  pricing_summary?: string
+  raw_metadata?: Record<string, unknown>
+  source_ids?: SourceId[]
   phone?: string
   operating_hours?: Record<string, string>
   amenities?: string[]

@@ -16,7 +16,9 @@
     "crawl:pica-followup": "bun run scripts/pcbang/raw-collect-pica-followup.ts",
     "crawl:parse-raw": "bun run scripts/pcbang/run-parser.ts",
     "crawl:classify-load-policy": "bun run scripts/pcbang/run-load-policy.ts",
-    "crawl:import-venues": "bun run scripts/pcbang/run-venue-import.ts"
+    "crawl:import-venues": "bun run scripts/pcbang/run-venue-import.ts",
+    "crawl:lite-run": "bun run scripts/pcbang/run-lite.ts",
+    "crawl:lite-load": "bun run scripts/pcbang/run-lite-load.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",

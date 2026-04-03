@@ -2,11 +2,62 @@ import { validateVenueContract } from '@/lib/pcbang/contracts/venue-contract'
 import { normalizePricingContract } from '@/lib/pcbang/contracts/pricing-contract'
 import type { ParsedVenueCandidate, ParserDiagnostic } from '@/lib/pcbang/parser/dto'
 import type { CanonicalVenueWithPricing } from '@/lib/pcbang/canonical/models'
+import type { SourceId } from '@/lib/pcbang/raw/dto'
 
 export interface CanonicalNormalizationResult {
   accepted: CanonicalVenueWithPricing[]
   invalid: ParsedVenueCandidate[]
   diagnostics: ParserDiagnostic[]
+}
+
+function buildPricingSummary(candidate: ParsedVenueCandidate): string | undefined {
+  const tiers = candidate.pricing_tiers ?? []
+
+  const summaryParts = tiers
+    .map((tier) => {
+      const segments: string[] = []
+
+      if (tier.description && tier.description.trim().length > 0) {
+        segments.push(tier.description.trim())
+      }
+
+      if (tier.pricing_structure && typeof tier.pricing_structure === 'object') {
+        for (const [key, value] of Object.entries(tier.pricing_structure)) {
+          if (typeof value === 'number' && Number.isFinite(value)) {
+            segments.push(`${key}:${value}`)
+            continue
+          }
+
+          if (typeof value === 'string' && value.trim().length > 0) {
+            segments.push(`${key}:${value.trim()}`)
+          }
+        }
+      }
+
+      if (segments.length === 0) {
+        return tier.tier_name.trim().length > 0 ? tier.tier_name.trim() : null
+      }
+
+      const label = tier.tier_name.trim().length > 0 ? `${tier.tier_name.trim()}=` : ''
+      return `${label}${segments.join(', ')}`
+    })
+    .filter((value): value is string => value !== null && value.length > 0)
+
+  if (summaryParts.length === 0) {
+    return undefined
+  }
+
+  return summaryParts.join(' | ')
+}
+
+function extractSourceId(sourceEntityKey: string): SourceId | null {
+  const [sourceId] = sourceEntityKey.split(':')
+
+  if (sourceId === 'geto' || sourceId === 'pica') {
+    return sourceId
+  }
+
+  return null
 }
 
 export function normalizeToCanonical(
@@ -17,6 +68,7 @@ export function normalizeToCanonical(
   const diagnostics: ParserDiagnostic[] = []
 
   for (const candidate of candidates) {
+    const sourceId = extractSourceId(candidate.source_entity_key)
     const result = validateVenueContract(candidate)
 
     if (result.ok) {
@@ -54,8 +106,29 @@ export function normalizeToCanonical(
         })
       }
 
+      if (!sourceId) {
+        diagnostics.push({
+          severity: 'warning',
+          target_id: 'canonical_source',
+          message: `Unable to extract source id from entity ${candidate.source_entity_key}`,
+          context: {
+            entity_key: candidate.source_entity_key,
+          },
+        })
+      }
+
       accepted.push({
-        venue: result.value,
+        venue: {
+          ...result.value,
+          ...(sourceId ? { source: sourceId } : {}),
+          source_id: candidate.source_entity_key,
+          location_text: result.value.address_full,
+          ...(buildPricingSummary(candidate)
+            ? { pricing_summary: buildPricingSummary(candidate) }
+            : {}),
+          ...(candidate.raw_metadata ? { raw_metadata: candidate.raw_metadata } : {}),
+          ...(sourceId ? { source_ids: [sourceId] } : {}),
+        },
         pricing_tiers,
       })
     } else {

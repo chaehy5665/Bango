@@ -1,0 +1,9 @@
+[
+  {
+    "id": "existing-fixture-1",
+    "name": "라이트 테스트 기존",
+    "address_full": "서울 서초구 서초대로 2",
+    "address_district": "서초구",
+    "source_ids": ["pica"]
+  }
+]

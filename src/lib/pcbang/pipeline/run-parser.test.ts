@@ -146,10 +146,18 @@ test('runParserPipeline reads a raw run and writes canonical parser output', asy
 
     const canonical = JSON.parse(await readFile(result.canonical_path, 'utf-8')) as Array<{
       venue: {
+        source: string
+        source_id: string
         name: string
+        address_full: string
+        location_text: string
         address_district: string
         lat: number
         lng: number
+        source_ids: string[]
+        raw_metadata: {
+          shop_seq: string
+        }
       }
       pricing_tiers: unknown[]
     }>
@@ -162,9 +170,15 @@ test('runParserPipeline reads a raw run and writes canonical parser output', asy
     assert.equal(manifest.parsed_targets.length, 2)
     assert.equal(canonical.length, 1)
     assert.equal(canonical[0].venue.name, '테스트피씨방')
+    assert.equal(canonical[0].venue.source, 'geto')
+    assert.equal(canonical[0].venue.source_id, 'geto:1005076')
+    assert.equal(canonical[0].venue.address_full, '서울 강남구 강남대로 123 지하1층')
+    assert.equal(canonical[0].venue.location_text, '서울 강남구 강남대로 123 지하1층')
     assert.equal(canonical[0].venue.address_district, '강남구')
     assert.equal(canonical[0].venue.lat, 37.512551076277)
     assert.equal(canonical[0].venue.lng, 127.02799753438)
+    assert.deepEqual(canonical[0].venue.source_ids, ['geto'])
+    assert.equal(canonical[0].venue.raw_metadata.shop_seq, '1005076')
     assert.equal(canonical[0].pricing_tiers.length, 0)
   } finally {
     await rm(tmpDir, { recursive: true, force: true })

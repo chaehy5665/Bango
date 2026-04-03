@@ -1,26 +1,71 @@
 # PC Bang Venue Operations Runbook
 
-This runbook documents the end-to-end venue data collection and import process for the GetO and Pica sources.
+This runbook documents the operational PCBang venue ingestion workflow for the GetO and Pica sources.
 
-## Overview
+## Default Workflow
 
-The `crawl:run` command orchestrates the full pipeline:
+Lite Mode is the **default practical ingestion path** for this repo.
 
-1. **Raw Collection**: Capture HTTP responses from source APIs
-2. **Follow-up Collection**: Fetch detail pages for each venue
-   - **Pica**: Fetches detail pages for venues extracted from paginated list (default 20 pages, configurable)
-   - **GetO**: Fetches Seoul district list, generates list pages across multiple districts/pages (default: 5 districts × 2 pages/district, capped at 10 total), then fetches detail pages for all unique shop_seq values
-3. **Parsing**: Extract structured data from raw captures
-4. **Load-Policy Classification**: Determine insertability and dedupe against existing venues
-5. **Venue Import**: Insert new venues into the database (dry-run by default)
+The primary operational path is:
 
-Each stage writes artifacts to `.sisyphus/evidence/pcbang/`, and a top-level operation summary is written to `.sisyphus/evidence/pcbang/run/<source>/<operation_id>/summary.json`.
+1. **Raw Collection** — capture source responses using the existing collectors
+2. **Parsing** — normalize raw captures into stable canonical venue records
+3. **Canonical Artifact** — inspect or reuse `canonical.json`
+4. **Lite Load** — validate essential fields, dedupe, and load directly into `venues`
+
+In short:
+
+`raw collect -> parse -> canonical.json -> lite loader -> venues`
+
+The legacy `load-policy -> venue-import` path still exists, but it is **advanced/manual only**.
+
+---
+
+## Lite Mode
+
+Lite Mode keeps the current raw collectors and parser, skips the heavier load-policy stage, and loads `canonical.json` directly into the `venues` table with a simpler summary.
+
+### What Lite Mode keeps
+
+- Raw collection that already exists
+- Source-specific parsing and canonical normalization
+- Essential field validation (`name`, `address_full`, `address_district`, `lat`, `lng`)
+- Dry-run by default
+- Safe DB writes limited to the `venues` table
+- Source provenance updates through `source_ids`
+- Reproducible snapshot-backed dry-runs via `crawl:lite-load`
+
+### What Lite Mode defers
+
+- Source approval/evaluation workflows
+- Load-policy review buckets
+- Rollback preview / evidence freeze workflows
+- Pricing ingestion beyond parser-level traceability
+- Browser E2E verification for the data pipeline
+
+### Minimal canonical shape
+
+The Lite pipeline operates on canonical venue records with these practical fields:
+
+- `source`
+- `source_id`
+- `name`
+- `location_text`
+- `address_full`
+- `address_district`
+- `lat`
+- `lng`
+- `pricing_summary` (when derivable)
+- `raw_metadata` (for traceability)
+- `source_ids`
+
+---
 
 ## Prerequisites
 
 ### Environment Variables
 
-Required for venue import (stage 5):
+Required for live DB apply operations:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=<your-supabase-url>
@@ -28,37 +73,54 @@ SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
 ```
 
 These must be set in your `.env` file or environment before running `--apply`.
-Dry-run import still reads the live `venues` table for deduplication, so these variables are also required for `crawl:run` dry-runs.
+
+For deterministic snapshot-backed dry-runs with `crawl:lite-load`, live DB credentials are **not required**.
+
+For `crawl:lite-run` dry-runs without `--existing-snapshot`, the Lite loader still reads existing `venues` for deduplication, so env credentials are required in that mode.
 
 ### Dependencies
 
 - Node.js/Bun runtime
 - Supabase project with `venues` table
-- Network access to current public source surfaces (GetO: `playgeto.com`, Pica: `picaplay.com`)
+- Network access to current public source surfaces (GetO: `playgeto.com`, Pica: `picaplay.com`) for raw collection
 
 ### Permissions
 
-- Service role key must have INSERT permissions on `venues` table
+- Service role key must have INSERT/UPDATE permissions on `venues` for `--apply`
 - Raw collection targets must be accessible (no auth/captcha required for current presets)
+- The target DB schema must include `venues.source_ids` for provenance-safe Lite apply runs
+
+---
 
 ## Command Reference
 
-### Basic Syntax
+### Default commands
 
 ```bash
-bun run crawl:run -- --source <geto|pica> [options]
+bun run crawl:lite-run -- --source <geto|pica> [options]
+bun run crawl:lite-load -- --input <canonical.json> [options]
 ```
 
-### Flags
+### Default Lite commands
+
+| Command | Purpose |
+|---|---|
+| `crawl:lite-run` | Default end-to-end path: collect -> parse -> lite load |
+| `crawl:lite-load` | Load `canonical.json` directly into `venues` |
+| `crawl:raw-collect` | Manual raw collection stage |
+| `crawl:pica-followup` | Manual Pica detail follow-up stage |
+| `crawl:parse-raw` | Manual raw -> canonical stage |
+
+### `crawl:lite-run` flags
 
 | Flag | Required | Values | Description |
 |------|----------|--------|-------------|
 | `--source` | Yes | `geto`, `pica` | Source to collect from |
 | `--run-id` | No | string | Custom operation ID (default: timestamp) |
-| `--apply` | No | (flag) | Apply inserts to database (default: dry-run) |
+| `--apply` | No | (flag) | Apply inserts/updates to database (default: dry-run) |
 | `--output-root` | No | path | Evidence root directory (default: `.sisyphus/evidence/pcbang`) |
 | `--timeout-ms` | No | integer | HTTP timeout in ms (default: 30000) |
-| `--existing-snapshot` | No | path | Path to existing venue snapshot JSON for deduplication |
+| `--existing-snapshot` | No | path | Existing venue snapshot JSON used by Lite load dedupe |
 | `--limit` | No | integer | Limit venue count (Pica only) |
 | `--seoul-only` | No | (flag) | Filter to Seoul venues only (Pica only) |
 | `--pica-max-pages` | No | integer | Max list pages to fetch (Pica only, default: 20) |
@@ -67,322 +129,282 @@ bun run crawl:run -- --source <geto|pica> [options]
 | `--geto-max-list-pages` | No | integer | Max total list pages (GetO only, default: 10) |
 | `--geto-max-details` | No | integer | Max detail pages to fetch (GetO only, no default limit) |
 
-### Flag Validation
+### `crawl:lite-load` flags
 
-- `--limit`, `--seoul-only`, and `--pica-max-pages` are **only valid for Pica** source. Using them with GetO will fail.
-- `--geto-district-limit`, `--geto-max-pages-per-district`, `--geto-max-list-pages`, and `--geto-max-details` are **only valid for GetO** source. Using them with Pica will fail.
-- `--apply` affects **only the final venue import stage**. All prior stages always run.
+| Flag | Required | Values | Description |
+|------|----------|--------|-------------|
+| `--input` | Yes | path | Path to parser `canonical.json` or direct canonical JSON array |
+| `--output-dir` | No | path | Output directory for Lite load reports |
+| `--existing-snapshot` | No | path | Existing venue snapshot JSON for deterministic dry-runs |
+| `--apply` | No | (flag) | Apply inserts/updates to database (default: dry-run) |
+
+### Flag validation
+
+- `--limit`, `--seoul-only`, and `--pica-max-pages` are only valid for Pica.
+- `--geto-district-limit`, `--geto-max-pages-per-district`, `--geto-max-list-pages`, and `--geto-max-details` are only valid for GetO.
+- `--apply` affects only the final Lite load stage.
+
+---
 
 ## Usage Examples
 
-### GetO: Dry-Run
-
-Collect GetO targets across Seoul districts, parse, classify, and prepare for import (no database writes):
+### Lite Mode: one-command dry-run
 
 ```bash
+# Pica example
+bun run crawl:lite-run -- --source pica --seoul-only --limit 10
+
+# GetO example
+bun run crawl:lite-run -- --source geto --geto-max-details 20
+```
+
+### Lite Mode: one-command dry-run with snapshot-backed dedupe
+
+```bash
+bun run crawl:lite-run -- --source pica --seoul-only --limit 10 --existing-snapshot tests/fixtures/pcbang/lite-existing-snapshot.json
+```
+
+### Lite Mode: one-command apply
+
+```bash
+bun run crawl:lite-run -- --source pica --seoul-only --limit 10 --apply
+```
+
+### Lite Mode: stage-by-stage workflow
+
+If you want to inspect the stable canonical layer directly:
+
+```bash
+# 1) Collect raw data (Pica example)
+bun run crawl:raw-collect -- --source pica --run-id lite-pica-seed
+bun run crawl:pica-followup -- --from-run lite-pica-seed --run-id lite-pica-detail --limit 10 --seoul-only
+
+# 2) Normalize into canonical records
+bun run crawl:parse-raw -- --source pica --run-id lite-pica-detail
+
+# 3) Load canonical records with Lite Mode dry-run
+bun run crawl:lite-load -- --input .sisyphus/evidence/pcbang/parser/pica/lite-pica-detail/canonical.json
+
+# 4) Apply the same load to DB
+bun run crawl:lite-load -- --input .sisyphus/evidence/pcbang/parser/pica/lite-pica-detail/canonical.json --apply
+```
+
+### Lite Mode: fully reproducible fixture dry-run
+
+This requires no live DB because it uses a checked-in snapshot:
+
+```bash
+bun run crawl:lite-load -- --input tests/fixtures/pcbang/lite-canonical.json --existing-snapshot tests/fixtures/pcbang/lite-existing-snapshot.json
+```
+
+### Lite Mode summary output
+
+Every Lite load prints and persists the same high-level counters:
+
+- `total_seen`
+- `valid`
+- `inserted`
+- `updated`
+- `skipped`
+- `errors`
+
+`valid` is the number of deduped canonical venue records that passed essential field validation and are eligible for insert/update/skip decisions.
+
+Artifacts are written under `.sisyphus/evidence/pcbang/lite-load/` and Lite orchestration summaries under `.sisyphus/evidence/pcbang/lite-run/`.
+
+---
+
+## Advanced / Manual Legacy Workflow
+
+The older `load-policy -> venue-import` path still exists for manual inspection-heavy runs, but it is no longer the default operational workflow.
+
+Use it only when you explicitly want `review-needed`, `skipped`, and `insertable.json` artifacts.
+
+### Legacy orchestrator
+
+```bash
+bun run crawl:run -- --source <geto|pica> [options]
+```
+
+### Legacy stages
+
+1. **Raw Collection** — Capture HTTP responses from source APIs
+2. **Follow-up Collection** — Fetch detail pages for each venue
+3. **Parsing** — Extract structured data from raw captures
+4. **Load-Policy Classification** — Determine insertability and dedupe against existing venues
+5. **Venue Import** — Insert new venues into the database (dry-run by default)
+
+### Legacy examples
+
+```bash
+# GetO legacy dry-run
 bun run crawl:run -- --source geto
-```
 
-**Expected output:**
-- District fetch manifest in `.sisyphus/evidence/pcbang/raw/geto/<operation_id>-districts/`
-- Raw collection (list pages) manifest in `.sisyphus/evidence/pcbang/raw/geto/<operation_id>-raw/`
-- Raw collection (detail) manifest in `.sisyphus/evidence/pcbang/raw/geto/<operation_id>-detail/`
-- Parsed canonical venues in `.sisyphus/evidence/pcbang/parser/geto/<operation_id>-detail/canonical.json`
-- Insertable venues in `.sisyphus/evidence/pcbang/load-policy/geto/<operation_id>-detail/insertable.json`
-- Dry-run import report in `.sisyphus/evidence/pcbang/venue-import/geto/<operation_id>/`
-- Top-level summary in `.sisyphus/evidence/pcbang/run/geto/<operation_id>/summary.json`
-
-**Note:** GetO now performs three raw collection stages: (1) fetch Seoul district list, (2) fetch list pages across districts, (3) fetch detail pages for all extracted shop_seq values.
-
-**Default behavior:** Fetches 5 districts × 2 pages/district = 10 list pages (default cap), then extracts all unique shop_seq values and fetches their detail pages.
-
-### GetO: Apply
-
-Same as above, but inserts new venues into the database:
-
-```bash
-bun run crawl:run -- --source geto --apply
-```
-
-**Caution:** This writes to production if `SUPABASE_SERVICE_ROLE_KEY` points to production.
-
-### GetO: Custom Operation ID
-
-Use a custom operation ID for audit/reference:
-
-```bash
-bun run crawl:run -- --source geto --run-id prod-geto-2026-03-28
-```
-
-Stage run IDs will be:
-- District fetch: `prod-geto-2026-03-28-districts`
-- Raw (list pages): `prod-geto-2026-03-28-raw`
-- Raw (detail): `prod-geto-2026-03-28-detail`
-- Parser: `prod-geto-2026-03-28-detail`
-- Load policy: `prod-geto-2026-03-28-detail`
-- Venue import: `prod-geto-2026-03-28`
-
-### GetO: Custom District and Page Limits
-
-Control coverage breadth:
-
-```bash
-# Narrow: 2 districts × 1 page/district
-bun run crawl:run -- --source geto --geto-district-limit 2 --geto-max-pages-per-district 1
-
-# Broad: 10 districts × 3 pages/district, capped at 20 list pages
-bun run crawl:run -- --source geto --geto-district-limit 10 --geto-max-pages-per-district 3 --geto-max-list-pages 20
-
-# Limit detail fetches to first 50 unique venues
-bun run crawl:run -- --source geto --geto-max-details 50
-```
-
-### Pica: Dry-Run with Seoul Filter and Limit
-
-Collect Pica paginated list (default 20 pages), follow up with detail pages for up to 10 Seoul venues, then parse/classify/dry-run import:
-
-```bash
+# Pica legacy dry-run
 bun run crawl:run -- --source pica --seoul-only --limit 10
+
+# Legacy manual classification stage
+bun run crawl:classify-load-policy -- --source pica --run-id lite-pica-detail
 ```
 
-**Expected behavior:**
-1. Seed collection: Fetch Pica venue list pages 1-20 (default, configurable)
-2. Extract and dedupe seeds by SEQ across all list pages
-3. Detail collection: Filter to Seoul addresses, limit to 10, fetch detail+map pages (20 HTTP requests total)
-4. Parse the 20 detail captures
-5. Classify and prepare insertable venues
-6. Dry-run import (no DB writes)
+### Legacy artifacts
 
-### Pica: Custom Page Count
+The legacy path writes `load-policy/` and `venue-import/` artifacts such as:
 
-Increase coverage by fetching more list pages:
+- `insertable.json`
+- `review-needed.json`
+- `skipped.json`
+- `venue-import/summary.json`
 
-```bash
-# Fetch 50 list pages instead of default 20
-bun run crawl:run -- --source pica --pica-max-pages 50 --seoul-only
-
-# Narrow test: 3 pages only
-bun run crawl:run -- --source pica --pica-max-pages 3 --limit 5
-```
-
-### Pica: Apply
-
-Full Pica collection with database inserts:
-
-```bash
-bun run crawl:run -- --source pica --apply
-```
-
-**Caution:** Without `--limit`, this collects **all Pica venues** (potentially hundreds). Use `--limit` for testing.
-
-### Pica: With Existing Snapshot
-
-Pass an existing venue snapshot to improve deduplication accuracy:
-
-```bash
-bun run crawl:run -- --source pica --existing-snapshot .sisyphus/evidence/venue-snapshot-2026-03-27.json --apply
-```
+---
 
 ## Artifact Layout
 
 All artifacts are written under `.sisyphus/evidence/pcbang/` by default. You can override with `--output-root`.
 
-### Directory Structure
-
-```
+```text
 .sisyphus/evidence/pcbang/
 ├── raw/                          # Stage 1: Raw HTTP captures
 │   ├── geto/
-│   │   └── <operation_id>-raw/
-│   │       ├── captures/         # Individual target captures
-│   │       └── run-manifest.json # Collection metadata
 │   └── pica/
-│       ├── <operation_id>-seed/  # Pica seed (list) collection
-│       └── <operation_id>-detail/ # Pica follow-up (detail) collection
-├── parser/                       # Stage 3: Parsed canonical data
+├── parser/                       # Parsed canonical data
 │   ├── geto/
-│   │   └── <operation_id>-detail/
-│   │       ├── canonical.json    # Valid canonical venues
-│   │       ├── diagnostics.json  # Parser warnings/errors
-│   │       └── parser-manifest.json
 │   └── pica/
-│       └── <operation_id>-detail/
-├── load-policy/                  # Stage 4: Classification
+├── lite-load/                    # Default final load stage
 │   ├── geto/
-│   │   └── <operation_id>-detail/
-│   │       ├── insertable.json   # Ready to insert
-│   │       ├── review-needed.json # Manual review required
-│   │       ├── skipped.json      # Filtered out
-│   │       ├── errors.json       # Classification errors
-│   │       └── summary.json
 │   └── pica/
-│       └── <operation_id>-detail/
-├── venue-import/                 # Stage 5: Import results
+├── lite-run/                     # Default end-to-end Lite summaries
 │   ├── geto/
-│   │   └── <operation_id>/
-│   │       ├── to-insert.json    # Venues that would be inserted
-│   │       ├── already-present.json # Dedupe matches
-│   │       ├── errors.json       # Import errors
-│   │       └── summary.json
 │   └── pica/
-│       └── <operation_id>/
-└── run/                          # Top-level operation summaries
-    ├── geto/
-    │   └── <operation_id>/
-    │       └── summary.json      # End-to-end operation summary
-    └── pica/
-        └── <operation_id>/
-            └── summary.json
+├── load-policy/                  # Legacy advanced/manual classification
+├── venue-import/                 # Legacy advanced/manual import results
+└── run/                          # Legacy end-to-end summaries
 ```
 
-### Key Artifacts
+### Key artifacts
 
-#### Operation Summary
+#### Lite load summary
 
-Path: `.sisyphus/evidence/pcbang/run/<source>/<operation_id>/summary.json`
+Path: `.sisyphus/evidence/pcbang/lite-load/<source>/<operation_id>/summary.json`
 
 Contains:
-- Operation ID, source, mode (dry-run or apply)
-- Start/completion timestamps
-- Stage run IDs (raw, parser, load-policy, venue-import)
-- Artifact paths for all stages
-- Counts: raw success/failure, parsed canonical, insertable venues/pricing, already present, import errors
-- Whether `--apply` ran
+- `total_seen`
+- `valid`
+- `inserted`
+- `updated`
+- `skipped`
+- `errors`
+- `apply_ran`
 
-#### Insertable Venues
+#### Lite run summary
+
+Path: `.sisyphus/evidence/pcbang/lite-run/<source>/<operation_id>/summary.json`
+
+Contains:
+- Operation ID, source, mode
+- Artifact paths for raw, parser, and Lite load stages
+- Counts for raw success/failure and Lite load summary fields
+
+#### Legacy insertable venues
 
 Path: `.sisyphus/evidence/pcbang/load-policy/<source>/<stage_run_id>/insertable.json`
 
-Format:
-```json
-{
-  "venues": [
-    {
-      "dedupe_key": "venue-name::address-full::district",
-      "venue": {
-        "name": "...",
-        "lat": 37.123,
-        "lng": 127.456,
-        "address_full": "...",
-        "address_district": "...",
-        ...
-      }
-    }
-  ],
-  "pricing": [...]
-}
-```
+This is the input to the legacy `crawl:import-venues` stage.
 
-This is the input to the venue import stage.
-
-#### Venue Import Summary
+#### Legacy venue import summary
 
 Path: `.sisyphus/evidence/pcbang/venue-import/<source>/<operation_id>/summary.json`
 
-Contains:
-- Input venue count (before deduplication)
-- Deduped insert count (unique venues to insert)
-- Already present count (matched existing venues by dedupe key)
-- Error count
-- `apply_ran`: true if inserts were written to database
+Contains legacy import counts such as input venue count, deduped insert count, already-present count, and `apply_ran`.
+
+---
 
 ## Caveats and Limitations
 
 ### No Automatic Resume/Retry
 
-If a stage fails mid-operation, the orchestrator **does not resume**. You must:
-1. Diagnose the failure (check stage manifests/errors)
-2. Re-run the full `crawl:run` command (or run individual stage commands if needed)
+If a stage fails mid-operation, the pipeline does not resume automatically. Re-run the failed flow or stage.
 
 ### Pica Two-Stage Collection
 
 Pica requires two raw collection stages:
-1. **Seed**: Fetch paginated list pages (default 20 pages, configurable via `--pica-max-pages`) to extract venue IDs
-2. **Detail**: Dedupe seeds by SEQ, then fetch detail+map pages for each unique venue
+1. **Seed** — Fetch paginated list pages to extract venue IDs
+2. **Detail** — Dedupe seeds by SEQ, then fetch detail+map pages for each unique venue
 
-The orchestrator handles this automatically. If you need to re-run only the detail stage, use the standalone `crawl:pica-followup` command.
+The Lite path reuses this existing collection behavior.
 
 ### GetO Three-Stage Collection
 
-GetO now performs three raw collection stages:
-1. **District fetch**: Fetch Seoul district list from the public API
-2. **List pages**: Generate and fetch list page targets across Seoul districts (default: 5 districts × 2 pages/district, capped at 10 total, configurable)
-3. **Detail**: Extract unique shop_seq values from all list HTMLs, then fetch each detail page
+GetO performs three raw collection stages:
+1. **District fetch** — Fetch Seoul district list from the public API
+2. **List pages** — Generate and fetch list page targets across Seoul districts/pages
+3. **Detail** — Extract unique `shop_seq` values and fetch detail pages
 
-The orchestrator handles this automatically. Default behavior fetches significantly more venues than the previous single-district approach.
+The Lite path reuses this existing collection behavior.
 
 ### Deduplication
 
-Venue deduplication uses `dedupe_key = name::address_full::district`. If any of these fields differ slightly (e.g., whitespace, typos), the venue will be treated as new.
+Venue deduplication uses `dedupe_key = name::address_full::district`.
 
-**Best practice:** Pass `--existing-snapshot` with a recent venue snapshot to improve accuracy.
-
-### Network Timeouts
-
-Default timeout is 30 seconds per HTTP request. If targets are slow, increase with `--timeout-ms`:
-
-```bash
-bun run crawl:run -- --source geto --timeout-ms 60000
-```
+For deterministic dry-runs, pass `--existing-snapshot` to `crawl:lite-load` or `crawl:lite-run`.
 
 ### Dry-Run is Default
 
-**The orchestrator defaults to dry-run.** No database writes occur unless you explicitly pass `--apply`.
+Lite commands default to dry-run. No database writes occur unless you explicitly pass `--apply`.
 
-### Existing Stage Commands Still Work
+### Legacy Commands Still Work
 
-The orchestrator wraps existing stage commands. You can still run them individually if needed:
+The legacy orchestrator and stage commands are still available for manual/advanced flows:
+
 - `crawl:raw-collect`
 - `crawl:pica-followup`
 - `crawl:parse-raw`
 - `crawl:classify-load-policy`
 - `crawl:import-venues`
 
-The orchestrator does **not** replace them.
+Lite Mode does not remove them; it simply stops treating them as the default operational path.
+
+---
 
 ## Troubleshooting
 
 ### Raw Collection Fails
 
-**Symptom:** `run-manifest.json` shows `status: "partial_failure"` and errors array is non-empty.
+**Symptom:** `run-manifest.json` shows failures or partial failures.
 
 **Diagnosis:**
 1. Check `.sisyphus/evidence/pcbang/raw/<source>/<run_id>/run-manifest.json`
-2. Look at `errors` array for specific target IDs and error messages
+2. Look at `errors` for specific targets and messages
 
 **Common causes:**
 - Network timeout (increase `--timeout-ms`)
-- Source API rate limiting (add delay between requests in `collector.ts`)
-- Auth/captcha requirement (check `source-presets.ts` target safety flags)
+- Source API rate limiting
+- Source shape changes requiring parser updates
 
 ### Parser Fails
 
-**Symptom:** Parser stage throws error or produces empty `canonical.json`.
+**Symptom:** Parser throws or produces empty/invalid `canonical.json`.
 
 **Diagnosis:**
 1. Check `.sisyphus/evidence/pcbang/parser/<source>/<run_id>/diagnostics.json`
 2. Look for `severity: "error"` entries
 
-**Common causes:**
-- Source changed response format (update parser logic in `parser/<source>/`)
-- Raw capture is malformed (re-run raw collection)
+### Lite Load Fails
 
-### Import Fails
-
-**Symptom:** Import stage completes but `errors.json` is non-empty.
+**Symptom:** Lite load completes but `errors.json` is non-empty.
 
 **Diagnosis:**
-1. Check `.sisyphus/evidence/pcbang/venue-import/<source>/<operation_id>/errors.json`
-2. Look for `reason` field (e.g., `insert_failed`, `duplicate_input_dedupe_key`)
+1. Check `.sisyphus/evidence/pcbang/lite-load/<source>/<operation_id>/errors.json`
+2. Look for `reason` such as `insert_failed` or `source_update_failed`
 
 **Common causes:**
-- Duplicate input venues (same dedupe key in input files)
-- Database constraint violation (check schema requirements)
-- Missing required fields (check `venue-contract.ts`)
+- Conflicting or malformed canonical input
+- Database constraint violation
+- Missing required fields (`name`, `address_full`, `address_district`, `lat`, `lng`)
 
 ### Supabase Connection Fails
 
-**Symptom:** Import stage throws "Supabase URL and service role key must be provided".
+**Symptom:** Apply mode throws that Supabase URL/service role key must be provided.
 
 **Fix:** Set environment variables in `.env`:
 
@@ -391,16 +413,29 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...
 ```
 
+### Schema Missing `source_ids`
+
+**Symptom:** Lite apply fails with an error that `venues.source_ids` does not exist.
+
+**Meaning:** The code is Lite-Mode-ready, but the target DB schema has not received the provenance-safe `source_ids` column yet.
+
+**Impact:**
+- Dry-runs with `--existing-snapshot` still work
+- Real Lite apply verification is blocked
+- Provenance-safe `source_ids` merge behavior cannot be validated until the DB schema is aligned
+
+---
+
 ## Next Steps
 
-After a successful `--apply` run:
-1. Verify inserts in Supabase dashboard or via `SELECT * FROM venues ORDER BY created_at DESC LIMIT 10`
-2. Review `already-present.json` for venues that were skipped due to deduplication
-3. Review `review-needed.json` in load-policy output for venues that need manual inspection
-4. Archive the operation summary for audit/reference
+After a successful Lite `--apply` run:
+1. Verify inserts in Supabase dashboard or via SQL
+2. Review Lite load `summary.json`, `to-insert.json`, and `to-update.json`
+3. If you intentionally used the legacy path, review `review-needed.json` in load-policy output
+4. Archive the Lite or legacy operation summary for audit/reference
 
 ## Related Documentation
 
 - [Source Evaluation](../../src/lib/pcbang/source-evaluation.ts) — Safety and feasibility rubric
-- [Load Policy](../../src/lib/pcbang/load-policy.ts) — Classification logic
+- [Load Policy](../../src/lib/pcbang/load-policy.ts) — Legacy advanced/manual classification logic
 - [Venue Contract](../../src/lib/pcbang/contracts/venue-contract.ts) — Schema validation

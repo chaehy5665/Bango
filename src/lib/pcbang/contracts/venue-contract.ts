@@ -32,6 +32,18 @@ function readOptionalString(source: Record<string, unknown>, key: string): strin
   return trimmed.length > 0 ? trimmed : undefined
 }
 
+function readOptionalRecord(
+  source: Record<string, unknown>,
+  key: string
+): Record<string, unknown> | undefined {
+  const value = source[key]
+  if (!isRecord(value)) {
+    return undefined
+  }
+
+  return value
+}
+
 function readNumber(source: Record<string, unknown>, key: string): number | null {
   const value = source[key]
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -46,6 +58,10 @@ function readNumber(source: Record<string, unknown>, key: string): number | null
   }
 
   return null
+}
+
+function isSourceId(value: unknown): value is 'geto' | 'pica' {
+  return value === 'geto' || value === 'pica'
 }
 
 export function validateVenueContract(input: unknown): ValidationResult<CanonicalVenueRecord> {
@@ -88,6 +104,31 @@ export function validateVenueContract(input: unknown): ValidationResult<Canonica
     lng: lng!,
   }
 
+  const source = readOptionalString(input, 'source')
+  if (isSourceId(source)) {
+    output.source = source
+  }
+
+  const sourceId = readOptionalString(input, 'source_id')
+  if (sourceId) {
+    output.source_id = sourceId
+  }
+
+  const locationText = readOptionalString(input, 'location_text')
+  if (locationText) {
+    output.location_text = locationText
+  }
+
+  const pricingSummary = readOptionalString(input, 'pricing_summary')
+  if (pricingSummary) {
+    output.pricing_summary = pricingSummary
+  }
+
+  const rawMetadata = readOptionalRecord(input, 'raw_metadata')
+  if (rawMetadata) {
+    output.raw_metadata = rawMetadata
+  }
+
   const phone = readOptionalString(input, 'phone')
   if (phone) {
     output.phone = phone
@@ -124,6 +165,14 @@ export function validateVenueContract(input: unknown): ValidationResult<Canonica
 
   if (typeof input.parking_available === 'boolean') {
     output.parking_available = input.parking_available
+  }
+
+  if (Array.isArray(input.source_ids)) {
+    const sourceIds = Array.from(new Set(input.source_ids.filter(isSourceId)))
+
+    if (sourceIds.length > 0) {
+      output.source_ids = sourceIds
+    }
   }
 
   return { ok: true, value: output }
