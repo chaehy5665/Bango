@@ -4,10 +4,14 @@ import { useEffect, useRef, useState } from 'react'
 import { Venue } from '@/types/venue'
 import { parsePostGISPoint } from '@/utils/geo-parser'
 
-type KakaoLatLng = object
+interface KakaoLatLng {
+  getLat: () => number
+  getLng: () => number
+}
 
 interface KakaoMapInstance {
   panTo: (latLng: KakaoLatLng) => void
+  getCenter: () => KakaoLatLng
   setLevel: (level: number) => void
   getLevel: () => number
 }
@@ -46,7 +50,7 @@ interface KakaoMapsNamespace {
   Size: new (width: number, height: number) => KakaoSize
   MarkerImage: new (src: string, size: KakaoSize) => KakaoMarkerImage
   event: {
-    addListener: (marker: KakaoMarker, eventName: 'click', handler: () => void) => void
+    addListener: (target: KakaoMarker | KakaoMapInstance, eventName: string, handler: () => void) => void
   }
 }
 
@@ -63,6 +67,7 @@ interface KakaoMapProps {
   center?: { lat: number; lng: number }
   zoom?: number
   onMarkerClick?: (venue: Venue) => void
+  onCenterChanged?: (center: { lat: number; lng: number }) => void
   userLocation?: { lat: number; lng: number } | null
 }
 
@@ -73,6 +78,7 @@ export function KakaoMap({
   center = SEOUL_CENTER,
   zoom = 3,
   onMarkerClick,
+  onCenterChanged,
   userLocation
 }: KakaoMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null)
@@ -81,6 +87,12 @@ export function KakaoMap({
   const markersRef = useRef<KakaoMarker[]>([])
   const clustererRef = useRef<KakaoMarkerClusterer | null>(null)
   const infoWindowRef = useRef<KakaoInfoWindow | null>(null)
+  const isProgrammaticPan = useRef(false)
+  const onCenterChangedRef = useRef(onCenterChanged)
+
+  useEffect(() => {
+    onCenterChangedRef.current = onCenterChanged
+  }, [onCenterChanged])
 
   // Load Kakao Maps SDK
   useEffect(() => {
@@ -106,8 +118,8 @@ export function KakaoMap({
     if (!isLoaded || !mapContainer.current) return
 
     const options = {
-      center: new window.kakao.maps.LatLng(SEOUL_CENTER.lat, SEOUL_CENTER.lng),
-      level: 3,
+      center: new window.kakao.maps.LatLng(center.lat, center.lng),
+      level: zoom,
     }
     
     const map = new window.kakao.maps.Map(mapContainer.current, options)
@@ -123,11 +135,31 @@ export function KakaoMap({
       gridSize: 60,
     })
 
+    window.kakao.maps.event.addListener(map, 'idle', () => {
+      if (isProgrammaticPan.current) {
+        isProgrammaticPan.current = false
+        return
+      }
+
+      const centerChangeHandler = onCenterChangedRef.current
+      if (!centerChangeHandler) return
+
+      const centerLatLng = map.getCenter()
+      centerChangeHandler({
+        lat: centerLatLng.getLat(),
+        lng: centerLatLng.getLng()
+      })
+    })
+
   }, [isLoaded])
 
   // Update Center when prop changes
   useEffect(() => {
     if (!mapInstance || !center) return
+    const currentCenter = mapInstance.getCenter()
+    if (currentCenter.getLat() === center.lat && currentCenter.getLng() === center.lng) return
+    
+    isProgrammaticPan.current = true
     const moveLatLon = new window.kakao.maps.LatLng(center.lat, center.lng)
     mapInstance.panTo(moveLatLon)
   }, [center, mapInstance])

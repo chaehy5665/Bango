@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { KakaoMap } from '@/components/map/kakao-map'
@@ -9,6 +9,7 @@ import { VenueFilters, DEFAULT_FILTERS, meetsGPUTier, isVenueOpen, is24Hour, Ope
 import { FilterPanel } from '@/components/filter/filter-panel'
 
 const SEOUL_CENTER = { lat: 37.5665, lng: 126.9780 }
+const MAP_CENTER_FETCH_DEBOUNCE_MS = 300
 
 export default function MapPage() {
   const router = useRouter()
@@ -18,8 +19,12 @@ export default function MapPage() {
   const [mapCenter, setMapCenter] = useState(SEOUL_CENTER)
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<VenueFilters>(DEFAULT_FILTERS)
+  const [isInitialCenterResolved, setIsInitialCenterResolved] = useState(false)
+  const latestRequestIdRef = useRef(0)
 
   const fetchVenues = async (lat: number, lng: number, radiusMeters: number = 5000) => {
+    const requestId = latestRequestIdRef.current + 1
+    latestRequestIdRef.current = requestId
     setLoading(true)
     setError(null)
     const supabase = createClient()
@@ -37,6 +42,10 @@ export default function MapPage() {
       
       const venueList = (venuesData || []) as Venue[]
       
+      if (requestId !== latestRequestIdRef.current) {
+        return
+      }
+
       if (venueList.length === 0) {
         setVenues([])
         return
@@ -85,6 +94,10 @@ export default function MapPage() {
         })
       }
 
+      if (requestId !== latestRequestIdRef.current) {
+        return
+      }
+
       const venuesWithData = venueList.map(venue => ({
         ...venue,
         pricing: pricingByVenue.get(venue.id) || [],
@@ -94,9 +107,13 @@ export default function MapPage() {
       
       setVenues(venuesWithData)
     } catch {
-      setError('주변 PC방을 불러오는데 실패했습니다.')
+      if (requestId === latestRequestIdRef.current) {
+        setError('주변 PC방을 불러오는데 실패했습니다.')
+      }
     } finally {
-      setLoading(false)
+      if (requestId === latestRequestIdRef.current) {
+        setLoading(false)
+      }
     }
   }
 
@@ -109,26 +126,39 @@ export default function MapPage() {
           const userLoc = { lat: latitude, lng: longitude }
           setUserLocation(userLoc)
           setMapCenter(userLoc)
-          fetchVenues(latitude, longitude, DEFAULT_FILTERS.distance)
+          setIsInitialCenterResolved(true)
         },
         () => {
-          // Fallback to Seoul center
-          fetchVenues(SEOUL_CENTER.lat, SEOUL_CENTER.lng, DEFAULT_FILTERS.distance)
+          setIsInitialCenterResolved(true)
         },
         { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
       )
     } else {
-      // Fallback if geolocation not supported
-      fetchVenues(SEOUL_CENTER.lat, SEOUL_CENTER.lng, DEFAULT_FILTERS.distance)
+      setIsInitialCenterResolved(true)
     }
   }, [])
 
-  // Handle filter changes - refetch venues with new distance radius
-  const activeLocation = userLocation ?? SEOUL_CENTER
+  const handleCenterChanged = useCallback((center: { lat: number; lng: number }) => {
+    setMapCenter((currentCenter) => {
+      if (currentCenter.lat === center.lat && currentCenter.lng === center.lng) {
+        return currentCenter
+      }
+
+      return center
+    })
+  }, [])
 
   useEffect(() => {
-    fetchVenues(activeLocation.lat, activeLocation.lng, filters.distance)
-  }, [activeLocation.lat, activeLocation.lng, filters.distance])
+    if (!isInitialCenterResolved) return
+
+    const timeoutId = window.setTimeout(() => {
+      fetchVenues(mapCenter.lat, mapCenter.lng, filters.distance)
+    }, MAP_CENTER_FETCH_DEBOUNCE_MS)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [filters.distance, isInitialCenterResolved, mapCenter.lat, mapCenter.lng])
 
   // Apply filters to venues (client-side filtering for non-distance filters)
   const filteredVenues = useMemo(() => {
@@ -190,6 +220,7 @@ export default function MapPage() {
           zoom={4} 
           userLocation={userLocation}
           onMarkerClick={(venue) => router.push(`/venues/${venue.id}`)}
+          onCenterChanged={handleCenterChanged}
         />
         
         {loading && (

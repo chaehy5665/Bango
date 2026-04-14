@@ -33,7 +33,7 @@ test.describe('Map Interaction', () => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
     })
     await page.route('**/rest/v1/venue_specs**', async (route) => {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' })
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
     })
     await page.route('**/rest/v1/venue_peripherals**', async (route) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
@@ -48,11 +48,25 @@ test.describe('Map Interaction', () => {
           window.kakao = {
             maps: {
               load: function (cb) { cb(); },
-              LatLng: function (lat, lng) { this.lat = lat; this.lng = lng; },
+              LatLng: function (lat, lng) {
+                this.lat = lat;
+                this.lng = lng;
+                this.getLat = function () { return this.lat; };
+                this.getLng = function () { return this.lng; };
+              },
               Map: function () {
-                this.panTo = function () {};
+                const center = new window.kakao.maps.LatLng(37.5665, 126.9780);
+                this.panTo = function (nextCenter) {
+                  center.lat = nextCenter.getLat();
+                  center.lng = nextCenter.getLng();
+                };
+                this.getCenter = function () { return center; };
                 this.setLevel = function () {};
                 this.getLevel = function () { return 3; };
+              },
+              MarkerClusterer: function () {
+                this.clear = function () {};
+                this.addMarkers = function () {};
               },
               Marker: function () {
                 this.setMap = function () {};
