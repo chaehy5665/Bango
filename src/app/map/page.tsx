@@ -1,12 +1,17 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useRef, useState, type ElementType } from 'react'
+import Link from 'next/link'
+import { MapPin, Phone, Clock, Monitor, HardDrive, Cpu, ExternalLink, X, Settings2, ShieldCheck, Zap } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { KakaoMap } from '@/components/map/kakao-map'
 import { Venue, VenueWithFilterData } from '@/types/venue'
 import { VenueFilters, DEFAULT_FILTERS, meetsGPUTier, isVenueOpen, is24Hour, OperatingHours } from '@/types/filters'
 import { FilterPanel } from '@/components/filter/filter-panel'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
 
 const SEOUL_CENTER = { lat: 37.5665, lng: 126.9780 }
 const MAP_CENTER_FETCH_DEBOUNCE_MS = 300
@@ -17,7 +22,6 @@ const GEOLOCATION_OPTIONS = {
 } as const
 
 export default function MapPage() {
-  const router = useRouter()
   const [venues, setVenues] = useState<VenueWithFilterData[]>([])
   const [loading, setLoading] = useState(true)
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
@@ -26,6 +30,15 @@ export default function MapPage() {
   const [filters, setFilters] = useState<VenueFilters>(DEFAULT_FILTERS)
   const [isInitialCenterResolved, setIsInitialCenterResolved] = useState(false)
   const latestRequestIdRef = useRef(0)
+
+  // Venue Detail Sheet State
+  const [selectedVenue, setSelectedVenue] = useState<VenueWithFilterData | null>(null)
+  const [isVenueSheetOpen, setIsVenueSheetOpen] = useState(false)
+
+  const handleMarkerClick = useCallback((venue: VenueWithFilterData) => {
+    setSelectedVenue(venue)
+    setIsVenueSheetOpen(true)
+  }, [])
 
   const requestUserLocation = useCallback((markInitialCenterResolved: boolean) => {
     return new Promise<boolean>((resolve) => {
@@ -248,7 +261,7 @@ export default function MapPage() {
           center={mapCenter} 
           zoom={4} 
           userLocation={userLocation}
-          onMarkerClick={(venue) => router.push(`/venues/${venue.id}`)}
+          onMarkerClick={handleMarkerClick}
           onCenterChanged={handleCenterChanged}
           onRequestUserLocation={handleRequestUserLocation}
         />
@@ -279,6 +292,224 @@ export default function MapPage() {
           </div>
         )}
       </main>
+
+      {/* Venue Detail Sheet */}
+      <Sheet open={isVenueSheetOpen} onOpenChange={setIsVenueSheetOpen}>
+        <SheetContent side="bottom" className="h-[85vh] md:h-[90vh] md:max-w-2xl md:right-0 md:left-auto md:border-l p-0 flex flex-col overflow-hidden" showCloseButton={false}>
+          {selectedVenue && (
+            <>
+              <SheetHeader className="p-5 border-b border-gray-100 flex-row items-center justify-between space-y-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                    <Zap className="w-6 h-6" strokeWidth={1.5} />
+                  </div>
+                  <div>
+                    <SheetTitle className="text-xl font-bold text-gray-950 truncate max-w-sm">
+                      {selectedVenue.name}
+                    </SheetTitle>
+                    <div className="flex items-center gap-1.5 text-sm text-gray-500 mt-0.5">
+                      <MapPin className="w-3.5 h-3.5" />
+                      <span>{selectedVenue.address_district}</span>
+                      {selectedVenue.distance_meters != null && (
+                        <>
+                          <span>•</span>
+                          <span>{Math.round(selectedVenue.distance_meters)}m</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <SheetClose asChild>
+                  <Button aria-label="상세 시트 닫기" variant="ghost" size="icon" className="rounded-full h-10 w-10 text-gray-500 hover:text-gray-900 hover:bg-gray-100">
+                    <X className="w-5 h-5" />
+                  </Button>
+                </SheetClose>
+              </SheetHeader>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {selectedVenue.phone && (
+                    <div className="bg-gray-50 rounded-lg p-4 flex items-center gap-3 border border-gray-100">
+                      <Phone className="w-5 h-5 text-indigo-600 flex-shrink-0" />
+                      <div>
+                        <div className="text-xs text-gray-500">전화번호</div>
+                        <div className="text-sm font-medium text-gray-900">{selectedVenue.phone}</div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="bg-gray-50 rounded-lg p-4 flex items-center gap-3 border border-gray-100 col-span-2">
+                    <Clock className="w-5 h-5 text-indigo-600 flex-shrink-0" />
+                    <div>
+                      <div className="text-xs text-gray-500">영업시간</div>
+                      <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                        {is24Hour(selectedVenue.operating_hours as OperatingHours) ? (
+                          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">24시간</Badge>
+                        ) : isVenueOpen(selectedVenue.operating_hours as OperatingHours) ? (
+                          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">영업중</Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">영업종료</Badge>
+                        )}
+                        <span className="text-xs text-gray-600">상세시간 본문 참고</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gray-50 rounded-lg p-4 flex items-center gap-3 border border-gray-100">
+                    <Settings2 className="w-5 h-5 text-indigo-600 flex-shrink-0" />
+                    <div>
+                      <div className="text-xs text-gray-500">총 좌석</div>
+                      <div className="text-sm font-medium text-gray-900">{selectedVenue.total_seats || '-'}석</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. PC Specs */}
+                {selectedVenue.specs && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-950 flex items-center gap-2">
+                      <Monitor className="w-5 h-5 text-indigo-600" />
+                      PC 사양
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <SpecCard icon={Cpu} label="CPU" value={selectedVenue.specs.cpu} />
+                      <SpecCard 
+                        icon={Zap} 
+                        label="GPU" 
+                        value={selectedVenue.specs.gpu} 
+                        badge={selectedVenue.specs.gpu.includes('40') ? 'High' : selectedVenue.specs.gpu.includes('30') ? 'Mid' : null} 
+                      />
+                      <SpecCard icon={HardDrive} label="RAM / Storage" value={`${selectedVenue.specs.ram_gb}GB / ${selectedVenue.specs.storage}`} />
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Peripherals & Amenities */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
+                  {selectedVenue.peripherals && selectedVenue.peripherals.length > 0 && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-gray-950 flex items-center gap-2">
+                        <Settings2 className="w-5 h-5 text-indigo-600" />
+                        주변기기
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedVenue.peripherals.map((p, i) => (
+                          <Badge key={i} variant="secondary" className="bg-gray-100 text-gray-800 border-gray-200 px-3 py-1 text-sm font-normal">
+                            <span className="font-semibold text-gray-950 mr-1.5">{p.brand}</span> {p.model}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-950 flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5 text-indigo-600" />
+                      편의시설
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedVenue.amenities && selectedVenue.amenities.length > 0 ? (
+                        selectedVenue.amenities.map((amenity) => (
+                          <Badge key={amenity} variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 px-3 py-1 text-sm font-medium">
+                            {amenity}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-sm text-gray-500">정보 없음</span>
+                      )}
+                      {selectedVenue.parking_available && (
+                        <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 px-3 py-1 text-sm font-medium">
+                          주차 가능
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* 4. Pricing Summary */}
+                {selectedVenue.pricing && selectedVenue.pricing.length > 0 && (
+                  <div className="space-y-4 pt-2">
+                    <h3 className="text-lg font-semibold text-gray-950">요금 정보 (요약)</h3>
+                    <div className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+                      {selectedVenue.pricing.slice(0, 2).map((tier, index) => {
+                        const numericPrices = tier.pricing_structure
+                          ? Object.values(tier.pricing_structure).filter((v): v is number => typeof v === 'number')
+                          : []
+                        const minPrice = numericPrices.length > 0 ? Math.min(...numericPrices) : null
+                        
+                        return (
+                          <div key={tier.tier_name} className={cn("p-5 flex items-center justify-between", index > 0 && "border-t border-gray-100")}>
+                            <div>
+                              <div className="font-semibold text-gray-900">{tier.tier_name}</div>
+                              <div className="text-xs text-gray-500 mt-0.5">
+                                {tier.pricing_structure ? `${Object.keys(tier.pricing_structure).length}개 요금제` : '요금 정보 없음'}
+                              </div>
+                            </div>
+                            {minPrice !== null && (
+                              <div className="text-right">
+                                <div className="text-sm text-gray-500">시간당 최저</div>
+                                <div className="text-lg font-bold text-indigo-700">₩{minPrice.toLocaleString()}~</div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                      {selectedVenue.pricing.length > 2 && (
+                        <div className="p-3 text-center bg-gray-50 border-t border-gray-100 text-xs text-gray-500">
+                          외 {selectedVenue.pricing.length - 2}개 요금제 더 있음
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+              <div className="sticky bottom-0 bg-white p-5 border-t border-gray-100 mt-auto shadow-[0_-4px_12px_rgba(0,0,0,0.03)]">
+                <Button asChild className="w-full bg-indigo-600 hover:bg-indigo-700 text-white" size="lg">
+                  <Link href={`/venues/${selectedVenue.id}`}>
+                    상세 정보 보기
+                    <ExternalLink className="w-4 h-4 ml-2" />
+                  </Link>
+                </Button>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+    </div>
+  )
+}
+
+interface SpecCardProps {
+  icon: ElementType
+  label: string
+  value: string
+  badge?: string | null
+}
+
+function SpecCard({ icon: Icon, label, value, badge }: SpecCardProps) {
+  return (
+    <div className="bg-white border border-gray-100 rounded-xl p-4 flex flex-col gap-2.5 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs font-medium text-gray-500 flex items-center gap-1.5">
+          <Icon className="w-3.5 h-3.5 text-indigo-500" />
+          {label}
+        </div>
+        {badge && (
+          <Badge variant="outline" className={cn(
+            "px-2 py-0.5 text-xs font-medium rounded",
+            badge === 'High' ? "bg-amber-50 text-amber-700 border-amber-200" :
+            badge === 'Mid' ? "bg-blue-50 text-blue-700 border-blue-200" :
+            "bg-gray-50 text-gray-700 border-gray-200"
+          )}>
+            {badge}
+          </Badge>
+        )}
+      </div>
+      <div className="text-sm font-semibold text-gray-950 line-clamp-2 min-h-[40px]">
+        {value}
+      </div>
     </div>
   )
 }

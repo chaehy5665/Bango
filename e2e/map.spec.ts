@@ -2,12 +2,12 @@ import { expect, test } from '@playwright/test'
 
 declare global {
   interface Window {
-    __kakaoMarkers?: Array<{ __triggerClick?: () => void }>
+    __kakaoClickableMarkers?: Array<{ __triggerClick?: () => void }>
   }
 }
 
 test.describe('Map Interaction', () => {
-  test('지도 페이지 로드, 마커 표시, 마커 클릭 이동', async ({ page }) => {
+  test('지도 페이지 로드, 마커 클릭 시 상세 sheet 표시', async ({ page }) => {
     await page.route('**/rpc/nearby_venues**', async (route) => {
       await route.fulfill({
         status: 200,
@@ -16,7 +16,7 @@ test.describe('Map Interaction', () => {
           {
             id: '11111111-1111-1111-1111-111111111111',
             name: '레전드 PC방 강남역점',
-            location: 'POINT(127.0286 37.4979)',
+            location: '0101000020e6100000992a1895d4c15f40d656ec2fbbbf4240',
             address_full: '서울특별시 강남구 강남대로 396',
             address_district: '강남구',
             operating_hours: { weekday: '00:00-24:00', weekend: '00:00-24:00' },
@@ -44,7 +44,7 @@ test.describe('Map Interaction', () => {
         status: 200,
         contentType: 'application/javascript',
         body: `
-          window.__kakaoMarkers = [];
+          window.__kakaoClickableMarkers = [];
           window.kakao = {
             maps: {
               load: function (cb) { cb(); },
@@ -70,7 +70,6 @@ test.describe('Map Interaction', () => {
               },
               Marker: function () {
                 this.setMap = function () {};
-                window.__kakaoMarkers.push(this);
               },
               InfoWindow: function () {
                 this.close = function () {};
@@ -81,7 +80,10 @@ test.describe('Map Interaction', () => {
               Size: function () {},
               event: {
                 addListener: function (marker, eventName, handler) {
-                  if (eventName === 'click') marker.__triggerClick = handler;
+                  if (eventName === 'click') {
+                    marker.__triggerClick = handler;
+                    window.__kakaoClickableMarkers.push(marker);
+                  }
                 }
               }
             }
@@ -92,16 +94,23 @@ test.describe('Map Interaction', () => {
 
     await page.goto('/map')
 
+    await expect
+      .poll(async () => page.evaluate(() => window.__kakaoClickableMarkers?.length ?? 0))
+      .toBeGreaterThan(0)
+
     await page.evaluate(() => {
-      const marker = window.__kakaoMarkers?.[0]
+      const marker = window.__kakaoClickableMarkers?.[0]
       if (marker?.__triggerClick) {
         marker.__triggerClick()
-        return
       }
-      window.location.assign('/venues/11111111-1111-1111-1111-111111111111')
     })
 
-    await expect(page).toHaveURL(/\/venues\//)
+    await expect(page).toHaveURL(/\/map/)
+    await expect(page.getByText('레전드 PC방 강남역점')).toBeVisible()
+    await expect(page.getByRole('link', { name: '상세 정보 보기' })).toBeVisible()
+
+    await page.getByRole('link', { name: '상세 정보 보기' }).click()
+    await expect(page).toHaveURL(/\/venues\/11111111-1111-1111-1111-111111111111/)
   })
 
   test('내 위치 버튼이 초기 위치 실패 후 다시 위치 요청을 시도함', async ({ page }) => {
@@ -141,7 +150,7 @@ test.describe('Map Interaction', () => {
           {
             id: '11111111-1111-1111-1111-111111111111',
             name: '레전드 PC방 강남역점',
-            location: 'POINT(127.0286 37.4979)',
+            location: '0101000020e6100000992a1895d4c15f40d656ec2fbbbf4240',
             address_full: '서울특별시 강남구 강남대로 396',
             address_district: '강남구',
             operating_hours: { weekday: '00:00-24:00', weekend: '00:00-24:00' },
@@ -169,7 +178,7 @@ test.describe('Map Interaction', () => {
         status: 200,
         contentType: 'application/javascript',
         body: `
-          window.__kakaoMarkers = [];
+          window.__kakaoClickableMarkers = [];
           window.kakao = {
             maps: {
               load: function (cb) { cb(); },
@@ -195,7 +204,6 @@ test.describe('Map Interaction', () => {
               },
               Marker: function () {
                 this.setMap = function () {};
-                window.__kakaoMarkers.push(this);
               },
               InfoWindow: function () {
                 this.close = function () {};
@@ -206,7 +214,10 @@ test.describe('Map Interaction', () => {
               Size: function () {},
               event: {
                 addListener: function (marker, eventName, handler) {
-                  if (eventName === 'click') marker.__triggerClick = handler;
+                  if (eventName === 'click') {
+                    marker.__triggerClick = handler;
+                    window.__kakaoClickableMarkers.push(marker);
+                  }
                 }
               }
             }
@@ -223,12 +234,12 @@ test.describe('Map Interaction', () => {
 
     await page.goto('/map')
 
-    const markerCountBefore = await page.evaluate(() => window.__kakaoMarkers?.length ?? 0)
+    const markerCountBefore = await page.evaluate(() => window.__kakaoClickableMarkers?.length ?? 0)
 
     await page.getByLabel('My Location').click()
 
     await expect
-      .poll(async () => page.evaluate(() => window.__kakaoMarkers?.length ?? 0))
+      .poll(async () => page.evaluate(() => window.__kakaoClickableMarkers?.length ?? 0))
       .toBeGreaterThan(markerCountBefore)
 
     expect(dialogMessage).toBeNull()
