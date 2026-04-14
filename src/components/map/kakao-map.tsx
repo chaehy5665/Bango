@@ -68,6 +68,7 @@ interface KakaoMapProps {
   zoom?: number
   onMarkerClick?: (venue: Venue) => void
   onCenterChanged?: (center: { lat: number; lng: number }) => void
+  onRequestUserLocation?: () => Promise<boolean>
   userLocation?: { lat: number; lng: number } | null
 }
 
@@ -79,6 +80,7 @@ export function KakaoMap({
   zoom = 3,
   onMarkerClick,
   onCenterChanged,
+  onRequestUserLocation,
   userLocation
 }: KakaoMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null)
@@ -249,12 +251,17 @@ export function KakaoMap({
       {/* Map Controls Overlay */}
       <div className="absolute bottom-6 right-4 z-10 flex flex-col gap-2">
         <button 
-          onClick={() => {
+          onClick={async () => {
             if (userLocation && mapInstance) {
               const loc = new window.kakao.maps.LatLng(userLocation.lat, userLocation.lng)
               mapInstance.panTo(loc)
-            } else {
-              alert('위치 정보를 가져올 수 없습니다.')
+              return
+            }
+
+            const didResolveUserLocation = await onRequestUserLocation?.()
+
+            if (!didResolveUserLocation) {
+              alert('위치 정보를 가져올 수 없습니다. 브라우저 위치 권한을 확인해주세요.')
             }
           }}
           className="bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 transition-colors"

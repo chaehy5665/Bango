@@ -10,6 +10,11 @@ import { FilterPanel } from '@/components/filter/filter-panel'
 
 const SEOUL_CENTER = { lat: 37.5665, lng: 126.9780 }
 const MAP_CENTER_FETCH_DEBOUNCE_MS = 300
+const GEOLOCATION_OPTIONS = {
+  enableHighAccuracy: false,
+  timeout: 10000,
+  maximumAge: 300000,
+} as const
 
 export default function MapPage() {
   const router = useRouter()
@@ -21,6 +26,43 @@ export default function MapPage() {
   const [filters, setFilters] = useState<VenueFilters>(DEFAULT_FILTERS)
   const [isInitialCenterResolved, setIsInitialCenterResolved] = useState(false)
   const latestRequestIdRef = useRef(0)
+
+  const requestUserLocation = useCallback((markInitialCenterResolved: boolean) => {
+    return new Promise<boolean>((resolve) => {
+      if (!navigator.geolocation) {
+        if (markInitialCenterResolved) {
+          setIsInitialCenterResolved(true)
+        }
+
+        resolve(false)
+        return
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords
+          const userLoc = { lat: latitude, lng: longitude }
+
+          setUserLocation(userLoc)
+          setMapCenter(userLoc)
+
+          if (markInitialCenterResolved) {
+            setIsInitialCenterResolved(true)
+          }
+
+          resolve(true)
+        },
+        () => {
+          if (markInitialCenterResolved) {
+            setIsInitialCenterResolved(true)
+          }
+
+          resolve(false)
+        },
+        GEOLOCATION_OPTIONS
+      )
+    })
+  }, [])
 
   const fetchVenues = async (lat: number, lng: number, radiusMeters: number = 5000) => {
     const requestId = latestRequestIdRef.current + 1
@@ -118,25 +160,12 @@ export default function MapPage() {
   }
 
   useEffect(() => {
-    // 1. Try to get user location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords
-          const userLoc = { lat: latitude, lng: longitude }
-          setUserLocation(userLoc)
-          setMapCenter(userLoc)
-          setIsInitialCenterResolved(true)
-        },
-        () => {
-          setIsInitialCenterResolved(true)
-        },
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-      )
-    } else {
-      setIsInitialCenterResolved(true)
-    }
-  }, [])
+    void requestUserLocation(true)
+  }, [requestUserLocation])
+
+  const handleRequestUserLocation = useCallback(async () => {
+    return requestUserLocation(false)
+  }, [requestUserLocation])
 
   const handleCenterChanged = useCallback((center: { lat: number; lng: number }) => {
     setMapCenter((currentCenter) => {
@@ -221,6 +250,7 @@ export default function MapPage() {
           userLocation={userLocation}
           onMarkerClick={(venue) => router.push(`/venues/${venue.id}`)}
           onCenterChanged={handleCenterChanged}
+          onRequestUserLocation={handleRequestUserLocation}
         />
         
         {loading && (
